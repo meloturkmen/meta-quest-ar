@@ -51,8 +51,28 @@
     ></script>
     <script src="https://www.WebRTC-Experiment.com/RecordRTC.js"></script>
     <script src="script.js"></script>
+    <script src="chat.js"></script>
 
-    <script>
+
+    <script >
+      
+        let stream = await navigator.mediaDevices.getUserMedia({video: false, audio: true});
+      let recorder = new RecordRTCPromisesHandler(stream, {
+          type: 'audio'
+      });
+
+      function hanldeStartRecording(){
+        console.log("handle start recording")
+           recorder.startRecording();
+      }
+
+      function handleStopRecording(){
+          await recorder.stopRecording();
+          let blob = await recorder.getBlob();
+
+          processAudio(blob);
+      }
+      
       AFRAME.registerComponent("car", {
         init: function () {
           window.addEventListener("keydown", this.onKeyDown.bind(this));
@@ -370,7 +390,7 @@
           };
           this.controlsDiv = document.getElementById("controls");
           this.controlStickDiv = document.getElementById("controlstick");
-          this.enabled = false;
+          this.isRecording = false;
 
           // Don't generate WebXR select events for interactions with the screen
           // controls to avoid duplicate input. This is a new proposed API, it
@@ -382,55 +402,18 @@
             ev.preventDefault();
           });
 
-          this.controlsDiv.addEventListener("pointerdown", (ev) => {
+          this.controlStickDiv.addEventListener("pointerdown", (ev) => {
             //console.log(ev.type, ev.offsetX, ev.offsetY);
             //this.controlStickDiv.style.visibility = '';
-            this.enabled = true;
-          });
-
-          this.controlsDiv.addEventListener("pointermove", (ev) => {
-            if (!this.enabled) return;
-            let evX = ev.pageX - this.controlsDiv.offsetLeft;
-            let evY = ev.pageY - this.controlsDiv.offsetTop;
-            //console.log(ev.type, evX, evY, ev);
-            this.controlStickDiv.style.left =
-              evX - this.controlStickDiv.offsetWidth / 2 + "px";
-            this.controlStickDiv.style.top =
-              evY - this.controlStickDiv.offsetHeight / 2 + "px";
-            this.emit(
-              (evX / this.controlsDiv.offsetWidth) * 2 - 1,
-              (evY / this.controlsDiv.offsetHeight) * 2 - 1
-            );
-          });
-
-          this.controlsDiv.addEventListener("pointerup", (ev) => {
-            this.enabled = false;
-            //console.log(ev.type, ev.offsetX, ev.offsetY);
-            this.controlStickDiv.style.left =
-              this.controlsDiv.offsetWidth / 2 -
-              this.controlStickDiv.offsetWidth / 2 +
-              "px";
-            this.controlStickDiv.style.top =
-              this.controlsDiv.offsetHeight / 2 -
-              this.controlStickDiv.offsetHeight / 2 +
-              "px";
-            this.emit(0, 0);
-            //this.controlStickDiv.style.visibility = 'hidden';
-          });
-
-          this.controlsDiv.addEventListener("pointerout", (ev) => {
-            this.enabled = false;
-            //console.log(ev.type, ev.offsetX, ev.offsetY);
-            this.controlStickDiv.style.left =
-              this.controlsDiv.offsetWidth / 2 -
-              this.controlStickDiv.offsetWidth / 2 +
-              "px";
-            this.controlStickDiv.style.top =
-              this.controlsDiv.offsetHeight / 2 -
-              this.controlStickDiv.offsetHeight / 2 +
-              "px";
-            this.emit(0, 0);
-            //this.controlStickDiv.style.visibility = 'hidden';
+            if (this.isRecording) {
+              handleStopRecording();
+              this.isRecording = false;
+              console.log("---recording---");
+            } else {
+              console.log("---recording stopped---");
+              handleStartRecording();
+              this.isRecording = true;
+            }
           });
         },
         tick: function () {},
@@ -480,9 +463,9 @@
   <body>
     <div id="overlay">
       <div id="controls">
-        <div id="controlstick">
+        <button id="controlstick">
           <i class="fa fa-microphone" style="font-size: 24px"></i>
-        </div>
+        </button>
       </div>
       <div id="exitbutton">Exit AR</div>
     </div>
@@ -569,24 +552,5 @@
            shadowCameraVisible: true;
       -->
     </a-scene>
-    <script src="chat.js"></script>
-    <script>
-      let stream = await navigator.mediaDevices.getUserMedia({video: false, audio: true});
-      let recorder = new RecordRTCPromisesHandler(stream, {
-          type: 'audio'
-      });
-      
-      function hanldeStartRecording(){
-           recorder.startRecording();
-      }
-      
-      function handleStopRecording(){
-          await recorder.stopRecording();
-          let blob = await recorder.getBlob();
-        
-          processAudio(blob);
-      }
-     
-    </script>
   </body>
 </html>
