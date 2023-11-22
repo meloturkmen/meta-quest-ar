@@ -70,11 +70,14 @@
       }
 
       async function handleStopRecording() {
-        stream=null;
+       
         await recorder.stopRecording();
         let blob = await recorder.getBlob();
 
         processAudio(blob);
+        
+        stream=null;
+        recorder=null;
       }
 
       // See also https://github.com/aframevr/aframe/pull/4356
@@ -314,7 +317,7 @@
               this.isRecording = true;
             }
             console.log("setup click handlers");
-            this.controlStickDiv.addEventListener("pointerdown", clickHandler);
+       
             this.controlStickDiv.addEventListener("click", clickHandler);
           }
         },
@@ -475,7 +478,7 @@
         }
       }
       console.log("setup click handlers");
-      controlStickDiv.addEventListener("pointerdown", clickHandler);
+     
       controlStickDiv.addEventListener("click", clickHandler);
     </script>
   </body>
