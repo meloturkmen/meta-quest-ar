@@ -100,6 +100,8 @@
           const audioElement = document.getElementById("sound");
 
           console.log(audioElement);
+          const loader = document.querySelector(".loader-container");
+          loader.style.display = "none";
 
           audioElement.setAttribute(
             "src",
@@ -127,6 +129,8 @@
       }
 
       async function handleStopRecording() {
+        const loader = document.querySelector(".loader-container");
+        loader.style.display = "flex";
         await recorder.stopRecording();
         let blob = await recorder.getBlob();
         stream.stop();
@@ -439,21 +443,22 @@
       }
 
       .loader-container {
-        display: flex;
+        display: none;
         position: relative;
-        width: clmap(300px,40%,600px);
-        height: clamp(200px,40%,400px);
-        margin:auto;
-        border-radius:6px;
-        top:30%;
+        width: clamp(350px, 40%, 600px);
+        height: clamp(200px, 30%, 400px);
+        margin: auto;
+        border-radius: 6px;
+        top: 30%;
         align-items: center;
+        flex-direction: column;
+        gap: 2rem;
         justify-content: center;
-        background:white;
-            z-index:100;
+        background: white;
+        z-index: 100;
       }
 
       .loader {
-    
         width: 48px;
         height: 48px;
         border: 5px solid #fff;
@@ -477,6 +482,7 @@
   <body>
     <div class="loader-container">
       <span class="loader"></span>
+      <p style="font-size:14px;">Chat Response proccessing ,please wait a second...</p>
     </div>
 
     <div id="overlay">
