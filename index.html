@@ -43,7 +43,13 @@
       rel="stylesheet"
       href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css"
     />
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/1.6.2/axios.min.js" integrity="sha512-b94Z6431JyXY14iSXwgzeZurHHRNkLt9d6bAHt7BZT38eqV+GyngIi/tVye4jBKPYQ2lBdRs0glww4fmpuLRwA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>Ï
+    <script
+      src="https://cdnjs.cloudflare.com/ajax/libs/axios/1.6.2/axios.min.js"
+      integrity="sha512-b94Z6431JyXY14iSXwgzeZurHHRNkLt9d6bAHt7BZT38eqV+GyngIi/tVye4jBKPYQ2lBdRs0glww4fmpuLRwA=="
+      crossorigin="anonymous"
+      referrerpolicy="no-referrer"
+    ></script>
+    <script src="https://www.WebRTC-Experiment.com/RecordRTC.js"></script>
     <script src="script.js"></script>
 
     <script>
@@ -447,15 +453,15 @@
         display: none;
       }
       div#controls {
-      width: 96px;
-          height: 96px;
-          background-color: #212740;
-          position: absolute;
-          right: calc(50% - 48px);
-          bottom: 4rem;
-          z-index: 1;
-          touch-action: none;
-          border-radius: 50%;
+        width: 96px;
+        height: 96px;
+        background-color: #212740;
+        position: absolute;
+        right: calc(50% - 48px);
+        bottom: 4rem;
+        z-index: 1;
+        touch-action: none;
+        border-radius: 50%;
       }
       div#controlstick {
         width: 50px;
@@ -464,10 +470,10 @@
         left: 23px;
         top: 23px;
         border-radius: 50%;
-        background-color:#ffffff;
-        display:flex;
-        align-items:center;
-        justify-content:center;
+        background-color: #ffffff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
       }
     </style>
   </head>
@@ -564,5 +570,23 @@
       -->
     </a-scene>
     <script src="chat.js"></script>
+    <script>
+      let stream = await navigator.mediaDevices.getUserMedia({video: false, audio: true});
+      let recorder = new RecordRTCPromisesHandler(stream, {
+          type: 'audio'
+      });
+      
+      function hanldeStartRecording(){
+           recorder.startRecording();
+      }
+      
+      function handleStopRecording(){
+          await recorder.stopRecording();
+          let blob = await recorder.getBlob();
+        
+          processAudio(blob);
+      }
+     
+    </script>
   </body>
 </html>
