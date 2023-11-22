@@ -55,7 +55,8 @@
 
     <script async>
       let stream, recorder;
-      async function setup() {
+      
+      async function handleStartRecording() {
         stream = await navigator.mediaDevices.getUserMedia({
           video: false,
           audio: true,
@@ -63,16 +64,13 @@
         recorder = new RecordRTCPromisesHandler(stream, {
           type: "audio",
         });
-      }
-      setup();
-
-      function handleStartRecording() {
         console.log(recorder);
         console.log("handle start recording");
         recorder.startRecording();
       }
 
       async function handleStopRecording() {
+        stream=null;
         await recorder.stopRecording();
         let blob = await recorder.getBlob();
 
@@ -458,27 +456,27 @@
       -->
     </a-scene>
     <script>
-    
-          const controlStickDiv = document.getElementById("controlstick");
-          let isRecording = false;
-      
-      console.log(controlStickDiv)
-          
-          function clickHandler(ev) {
-            //console.log(ev.type, ev.offsetX, ev.offsetY);
-            //this.controlStickDiv.style.visibility = '';
-            if (isRecording) {
-              handleStopRecording();
-              isRecording = false;
-              console.log("---recording stopped---");
-            } else {
-              console.log("---recording---");
-              handleStartRecording();
-              isRecording = true;
-            }
-            console.log("setup click handlers");
-           controlStickDiv.addEventListener("pointerdown", clickHandler);
-           controlStickDiv.addEventListener("click", clickHandler);
+      const controlStickDiv = document.getElementById("controlstick");
+      let isRecording = false;
+
+      console.log(controlStickDiv);
+
+      function clickHandler(ev) {
+        //console.log(ev.type, ev.offsetX, ev.offsetY);
+        //this.controlStickDiv.style.visibility = '';
+        if (isRecording) {
+          handleStopRecording();
+          isRecording = false;
+          console.log("---recording stopped---");
+        } else {
+          console.log("---recording---");
+          handleStartRecording();
+          isRecording = true;
+        }
+      }
+      console.log("setup click handlers");
+      controlStickDiv.addEventListener("pointerdown", clickHandler);
+      controlStickDiv.addEventListener("click", clickHandler);
     </script>
   </body>
 </html>
