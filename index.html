@@ -391,6 +391,28 @@
         tick: function () {},
       });
 
+      AFRAME.registerComponent("chat-button", {
+        init: function () {
+          let isRecording = false;
+
+          function clickHandler() {
+            //console.log(ev.type, ev.offsetX, ev.offsetY);
+            //this.controlStickDiv.style.visibility = '';
+            if (isRecording) {
+              handleStopRecording();
+              isRecording = false;
+              console.log("---recording stopped---");
+            } else {
+              console.log("---recording---");
+              handleStartRecording();
+              isRecording = true;
+            }
+          }
+
+          this.el.addEventListener("click", clickHandler);
+        },
+      });
+
       AFRAME.registerComponent("exit-ar-button", {
         init: function () {
           console.log("exit-ar-button init");
@@ -404,6 +426,9 @@
       });
     </script>
     <style>
+      #overlay {
+        display: none;
+      }
       div.a-orientation-modal {
         display: none;
       }
@@ -502,7 +527,6 @@
     </div>
     <a-scene
       physics="debug: false"
-      webxr="optionalFeatures: dom-overlay; overlayElement: #overlay"
       obb-collider="showColliders: false"
       renderer="colorManagement: true;"
       xr-mode-ui="XRMode: ar"
@@ -537,22 +561,14 @@
           >
             <a-entity screen-touch
           /></a-entity>
-
-          <a-sphere
-            position="0 0.5 -1"
-            translate="0 1.75 0"
-            radius="1.75"
-            color="#7BC8A4"
-            roughness="0.2"
-          >
-            <a-image
-              src="../_images/radial-shadow-3.png"
-              rotation="-90 0 0"
-              scale="1.75 1.75 1.75"
-            ></a-image>
-          </a-sphere>
         </a-camera>
-
+        <a-sphere
+          chat-button
+          position="0 1 -1.5"
+          translate="0 3 0"
+          radius="0.1"
+          color="#ECECEC"
+        />
         <a-entity exit-ar-button></a-entity>
       </a-entity>
 
@@ -597,31 +613,6 @@
            shadowCameraVisible: true;
       -->
     </a-scene>
-    <script>
-      const controlStickDiv = document.getElementById("controlstick");
-      let isRecording = false;
-
-      console.log(controlStickDiv);
-
-      function clickHandler(ev) {
-        //console.log(ev.type, ev.offsetX, ev.offsetY);
-        //this.controlStickDiv.style.visibility = '';
-        if (isRecording) {
-          controlStickDiv.classList.remove("pulse");
-
-          handleStopRecording();
-          isRecording = false;
-          console.log("---recording stopped---");
-        } else {
-          controlStickDiv.classList.add("pulse");
-          console.log("---recording---");
-          handleStartRecording();
-          isRecording = true;
-        }
-      }
-      console.log("setup click handlers");
-
-      controlStickDiv.addEventListener("click", clickHandler);
-    </script>
+    <script></script>
   </body>
 </html>
