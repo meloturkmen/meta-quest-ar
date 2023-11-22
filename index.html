@@ -139,7 +139,7 @@
         await recorder.stopRecording();
         let blob = await recorder.getBlob();
         stream.stop();
-        console.log("send data to procesess aduio function",blob)
+        console.log("send data to procesess aduio function", blob);
         processAudio(blob);
 
         stream = null;
@@ -537,6 +537,20 @@
           >
             <a-entity screen-touch
           /></a-entity>
+
+          <a-sphere
+            position="0 0.5 -1"
+            translate="0 1.75 0"
+            radius="1.75"
+            color="#7BC8A4"
+            roughness="0.2"
+          >
+            <a-image
+              src="../_images/radial-shadow-3.png"
+              rotation="-90 0 0"
+              scale="1.75 1.75 1.75"
+            ></a-image>
+          </a-sphere>
         </a-camera>
 
         <a-entity exit-ar-button></a-entity>
