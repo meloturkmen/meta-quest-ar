@@ -58,6 +58,8 @@
         : "https://holonext-ai-assistant.onrender.com";
 
       async function processAudio(recordingBlob) {
+        console.log("Processing audio...");
+
         const formData = new FormData();
         formData.append("audio", recordingBlob);
 
@@ -71,7 +73,7 @@
               },
             }
           );
-
+          console.log("Speech to text response:", response);
           getChatGPTResponse({ transcript: response.data.text });
         } catch (error) {
           console.log("error", error);
@@ -79,7 +81,7 @@
       }
 
       const getChatGPTResponse = async ({ transcript }) => {
-        console.log("sending transcript : ", transcript);
+        console.log("Sending transcript to chat API:", transcript);
         try {
           const response = await axios.post(`${SERVER_URL}/api/chat`, {
             message: transcript,
@@ -88,7 +90,8 @@
           const answer = response.data.answer || "How can ı help you?";
           const answerAudio = response.data.audio;
 
-          console.log("answer", answer);
+          console.log("Chat API response:", response);
+          console.log("Answer:", answer);
 
           // convert audio buffer to blob
           const buffer = new Uint8Array(answerAudio.data);
@@ -116,6 +119,7 @@
       let stream, recorder;
 
       async function handleStartRecording() {
+        console.log("Starting recording...");
         stream = await navigator.mediaDevices.getUserMedia({
           video: false,
           audio: true,
@@ -129,12 +133,13 @@
       }
 
       async function handleStopRecording() {
+        console.log("Stopping recording...");
         const loader = document.querySelector(".loader-container");
         loader.style.display = "flex";
         await recorder.stopRecording();
         let blob = await recorder.getBlob();
         stream.stop();
-
+        console.log("send data to procesess aduio function",blob)
         processAudio(blob);
 
         stream = null;
@@ -482,7 +487,9 @@
   <body>
     <div class="loader-container">
       <span class="loader"></span>
-      <p style="font-size:14px;">Chat Response proccessing ,please wait a second...</p>
+      <p style="font-size: 14px">
+        Chat Response proccessing ,please wait a second...
+      </p>
     </div>
 
     <div id="overlay">
