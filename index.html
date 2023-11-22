@@ -452,7 +452,7 @@
       </a-assets>
 
       <a-entity>
-        <a-camera position="0 1.2 0" wasd-controls-enabled="false">
+        <a-camera position="0 1.75 0" wasd-controls-enabled="false">
           <a-entity
             id="cursor"
             cursor="rayOrigin: mouse"
@@ -485,12 +485,12 @@
 
       <a-entity
         id="a-character"
-        position="0 0 -1"
+        position="0 0 -2"
         gltf-model="#character"
         anchored="persistent: true"
         grabbable
       ></a-entity>
-      <a-sound id="sound" src="url(no.mp3)"/>
+      <a-sound id="sound" src="url(no.mp3)" />
       <a-plane
         src="#ground"
         height="200"
