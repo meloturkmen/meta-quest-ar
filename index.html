@@ -106,7 +106,7 @@
 
       let stream, recorder;
 
-      async function setup() {
+      async function handleStartRecording() {
         stream = await navigator.mediaDevices.getUserMedia({
           video: false,
           audio: true,
@@ -116,33 +116,13 @@
           type: "audio",
         });
 
-        mute();
-      }
-
-      function mute() {
-        stream.getAudioTracks().forEach(function (track) {
-          console.log(track);
-        });
-      }
-
-      function unmute() {
-        stream.getAudioTracks().forEach(function (track) {
-          track.stop();
-        });
-      }
-      setup();
-
-      async function handleStartRecording() {
-        console.log(recorder);
-        console.log("handle start recording");
-        unmute();
         recorder.startRecording();
       }
 
       async function handleStopRecording() {
+        stream.stop();
         await recorder.stopRecording();
         let blob = await recorder.getBlob();
-        mute();
         processAudio(blob);
       }
 
@@ -551,12 +531,13 @@
         //console.log(ev.type, ev.offsetX, ev.offsetY);
         //this.controlStickDiv.style.visibility = '';
         if (isRecording) {
-          controlStickDiv.classList.add("pulse");
+          controlStickDiv.classList.remove("pulse");
+
           handleStopRecording();
           isRecording = false;
           console.log("---recording stopped---");
         } else {
-          controlStickDiv.classList.remove("pulse");
+          controlStickDiv.classList.add("pulse");
           console.log("---recording---");
           handleStartRecording();
           isRecording = true;
