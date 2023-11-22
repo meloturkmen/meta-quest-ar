@@ -51,7 +51,6 @@
     ></script>
     <script src="https://www.WebRTC-Experiment.com/RecordRTC.js"></script>
     <script src="script.js"></script>
-    <script src="chat.js"></script>
 
     <script>
       const SERVER_URL = window.location.origin.includes("localhost")
@@ -105,7 +104,7 @@
         }
       };
 
-      let stream;
+      let stream, recorder;
 
       async function setup() {
         stream = await navigator.mediaDevices.getUserMedia({
@@ -117,23 +116,33 @@
           type: "audio",
         });
 
-        stream.getAudioTracks()[0].enabled = false;
+        mute();
       }
-    
+
+      function mute() {
+        stream.getAudioTracks().forEach(function (track) {
+          console.log(track);
+        });
+      }
+
+      function unmute() {
+        stream.getAudioTracks().forEach(function (track) {
+          track.stop();
+        });
+      }
       setup();
-      
+
       async function handleStartRecording() {
         console.log(recorder);
         console.log("handle start recording");
-
-        stream.getAudioTracks()[0].enabled = true;
+        unmute();
         recorder.startRecording();
       }
 
       async function handleStopRecording() {
         await recorder.stopRecording();
         let blob = await recorder.getBlob();
-        stream.getAudioTracks()[0].enabled = true;
+        mute();
         processAudio(blob);
       }
 
@@ -430,8 +439,11 @@
         0% {
           transform: scale(1);
         }
+        50% {
+          transform: scale(1.25);
+        }
         100% {
-          transform: scale(1.1);
+          transform: scale(1);
         }
       }
     </style>
