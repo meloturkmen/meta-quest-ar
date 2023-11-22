@@ -105,29 +105,36 @@
         }
       };
 
-      let stream, recorder;
+      let stream;
 
-      async function handleStartRecording() {
+      async function setup() {
         stream = await navigator.mediaDevices.getUserMedia({
           video: false,
           audio: true,
         });
+
         recorder = new RecordRTCPromisesHandler(stream, {
           type: "audio",
         });
+
+        stream.getAudioTracks()[0].enabled = false;
+      }
+    
+      setup();
+      
+      async function handleStartRecording() {
         console.log(recorder);
         console.log("handle start recording");
+
+        stream.getAudioTracks()[0].enabled = true;
         recorder.startRecording();
       }
 
       async function handleStopRecording() {
         await recorder.stopRecording();
         let blob = await recorder.getBlob();
-
+        stream.getAudioTracks()[0].enabled = true;
         processAudio(blob);
-
-        stream = null;
-        recorder = null;
       }
 
       // See also https://github.com/aframevr/aframe/pull/4356
@@ -414,6 +421,19 @@
         align-items: center;
         justify-content: center;
       }
+
+      .pulse {
+        animation: scale 2s infinite;
+      }
+
+      @keyframes scale {
+        0% {
+          transform: scale(1);
+        }
+        100% {
+          transform: scale(1.1);
+        }
+      }
     </style>
   </head>
   <body>
@@ -519,10 +539,12 @@
         //console.log(ev.type, ev.offsetX, ev.offsetY);
         //this.controlStickDiv.style.visibility = '';
         if (isRecording) {
+          controlStickDiv.classList.add("pulse");
           handleStopRecording();
           isRecording = false;
           console.log("---recording stopped---");
         } else {
+          controlStickDiv.classList.remove("pulse");
           console.log("---recording---");
           handleStartRecording();
           isRecording = true;
