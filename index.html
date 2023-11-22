@@ -72,7 +72,7 @@
               },
             }
           );
-
+          window.alert(response.data.text);
           getChatGPTResponse({ transcript: response.data.text });
         } catch (error) {
           console.log("error", error);
@@ -490,7 +490,7 @@
         anchored="persistent: true"
         grabbable
       ></a-entity>
-
+      <a-sound id="sound" src="url(no.mp3)"/>
       <a-plane
         src="#ground"
         height="200"
