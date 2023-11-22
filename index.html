@@ -390,7 +390,32 @@
 
         tick: function () {},
       });
+      /* global AFRAME */
+      AFRAME.registerComponent("anchor-grabbed-entity", {
+        init: function () {
+          this.el.addEventListener("grabstarted", this.deleteAnchor.bind(this));
+          this.el.addEventListener("grabended", this.updateAnchor.bind(this));
+        },
 
+        updateAnchor: function (evt) {
+          var grabbedEl = evt.detail.grabbedEl;
+          var anchoredComponent = grabbedEl.components.anchored;
+          if (anchoredComponent) {
+            anchoredComponent.createAnchor(
+              grabbedEl.object3D.position,
+              grabbedEl.object3D.quaternion
+            );
+          }
+        },
+
+        deleteAnchor: function (evt) {
+          var grabbedEl = evt.detail.grabbedEl;
+          var anchoredComponent = grabbedEl.components.anchored;
+          if (anchoredComponent) {
+            anchoredComponent.deleteAnchor();
+          }
+        },
+      });
       AFRAME.registerComponent("chat-button", {
         init: function () {
           let isRecording = false;
@@ -408,8 +433,8 @@
               isRecording = true;
             }
           }
-
-          this.el.addEventListener("click", clickHandler);
+          this.el.addEventListener("pointerdown", clickHandler);
+          // this.el.addEventListener("click", clickHandler);
         },
       });
 
@@ -595,6 +620,17 @@
         grabbable
       ></a-entity>
       <a-sound id="sound" src="" autoplay="true" position="0 2 5"></a-sound>
+      <a-entity
+        id="rightHand"
+        hand-tracking-grab-controls="hand: right"
+        anchor-grabbed-entity
+      ></a-entity>
+      <a-entity
+        id="leftHand"
+        hand-tracking-grab-controls="hand: left"
+        anchor-grabbed-entity
+      ></a-entity>
+
       <a-plane
         src="#ground"
         height="200"
