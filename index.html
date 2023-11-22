@@ -58,6 +58,8 @@
         : "https://holonext-ai-assistant.onrender.com";
 
       async function processAudio(recordingBlob) {
+        
+      
         const formData = new FormData();
         formData.append("audio", recordingBlob);
 
@@ -71,7 +73,7 @@
               },
             }
           );
-          window.alert(response.data.text);
+       
           getChatGPTResponse({ transcript: response.data.text });
         } catch (error) {
           console.log("error", error);
@@ -119,14 +121,15 @@
         recorder = new RecordRTCPromisesHandler(stream, {
           type: "audio",
         });
-
+       
         recorder.startRecording();
       }
 
       async function handleStopRecording() {
-        stream.stop();
+      
         await recorder.stopRecording();
         let blob = await recorder.getBlob();
+          stream.stop();
         processAudio(blob);
       }
 
@@ -446,7 +449,6 @@
       webxr="optionalFeatures: dom-overlay; overlayElement: #overlay"
       obb-collider="showColliders: false"
       renderer="colorManagement: true;"
-      button
       xr-mode-ui="XRMode: ar"
     >
       <a-assets>
