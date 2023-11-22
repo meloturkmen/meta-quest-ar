@@ -1,5 +1,6 @@
-// const SERVER_URL = window.location.origin.includes('localhost')
-const SERVER_URL = "http://localhost:5000";
+const SERVER_URL = window.location.origin.includes('localhost')
+	? 'http://localhost:5000'
+	: 'https://holonext-ai-assistant.onrender.com';
 
 const processAudio = async (recordingBlob) => {
   const formData = new FormData();
@@ -16,13 +17,13 @@ const processAudio = async (recordingBlob) => {
       }
     );
 
-    return response.data.text;
+    getChatGPTResponse({transcript:response.data.text;})
   } catch (error) {
     console.log("error", error);
   }
 };
 
-const getChatGPTResponse = async (transcript) => {
+const getChatGPTResponse = async ({transcript}) => {
   console.log("sending transcript : ", transcript);
   try {
     const response = await axios.post(`${SERVER_URL}/api/chat`, {
