@@ -58,8 +58,6 @@
         : "https://holonext-ai-assistant.onrender.com";
 
       async function processAudio(recordingBlob) {
-        
-      
         const formData = new FormData();
         formData.append("audio", recordingBlob);
 
@@ -73,7 +71,7 @@
               },
             }
           );
-       
+
           getChatGPTResponse({ transcript: response.data.text });
         } catch (error) {
           console.log("error", error);
@@ -103,7 +101,10 @@
 
           console.log(audioElement);
 
-          audioElement.setAttribute("src",`url(${URL.createObjectURL(audioData)})`);
+          audioElement.setAttribute(
+            "src",
+            `url(${URL.createObjectURL(audioData)})`
+          );
           audioElement.play();
         } catch (error) {
           console.log("error", error);
@@ -121,16 +122,19 @@
         recorder = new RecordRTCPromisesHandler(stream, {
           type: "audio",
         });
-       
+
         recorder.startRecording();
       }
 
       async function handleStopRecording() {
-      
         await recorder.stopRecording();
         let blob = await recorder.getBlob();
-          stream.stop();
+        stream.stop();
+
         processAudio(blob);
+
+        stream = null;
+        recorder = null;
       }
 
       // See also https://github.com/aframevr/aframe/pull/4356

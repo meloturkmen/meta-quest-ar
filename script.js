@@ -86673,4 +86673,3 @@ module.exports = getWakeLock();
 
 },{"./util.js":215}]},{},[174])(174)
 });
-//# sourceMappingURL=aframe-master.js.map
