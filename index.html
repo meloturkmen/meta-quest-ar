@@ -53,13 +53,12 @@
     <script src="script.js"></script>
     <script src="chat.js"></script>
 
-    <script async>
+    <script>
+      const SERVER_URL = window.location.origin.includes("localhost")
+        ? "http://localhost:5000"
+        : "https://holonext-ai-assistant.onrender.com";
 
-            const SERVER_URL = window.location.origin.includes('localhost')
-      	? 'http://localhost:5000'
-      	: 'https://holonext-ai-assistant.onrender.com';
-
-      async function  processAudio(recordingBlob){
+      async function processAudio(recordingBlob) {
         const formData = new FormData();
         formData.append("audio", recordingBlob);
 
@@ -74,13 +73,13 @@
             }
           );
 
-          getChatGPTResponse({transcript:response.data.text;})
+          getChatGPTResponse({ transcript: response.data.text });
         } catch (error) {
           console.log("error", error);
         }
-      };
+      }
 
-      const getChatGPTResponse = async ({transcript}) => {
+      const getChatGPTResponse = async ({ transcript }) => {
         console.log("sending transcript : ", transcript);
         try {
           const response = await axios.post(`${SERVER_URL}/api/chat`, {
@@ -95,7 +94,9 @@
           // convert audio buffer to blob
           const buffer = new Uint8Array(answerAudio.data);
           const blob = new Blob([buffer], { type: "audio/mpeg" });
-          const audioData = new File([blob], "answer.mp3", { type: "audio/mpeg" });
+          const audioData = new File([blob], "answer.mp3", {
+            type: "audio/mpeg",
+          });
 
           const audio = new Audio(URL.createObjectURL(audioData));
           audio.play();
@@ -104,289 +105,287 @@
         }
       };
 
+      let stream, recorder;
 
-            let stream, recorder;
+      async function handleStartRecording() {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: false,
+          audio: true,
+        });
+        recorder = new RecordRTCPromisesHandler(stream, {
+          type: "audio",
+        });
+        console.log(recorder);
+        console.log("handle start recording");
+        recorder.startRecording();
+      }
 
-            async function handleStartRecording() {
-              stream = await navigator.mediaDevices.getUserMedia({
-                video: false,
-                audio: true,
-              });
-              recorder = new RecordRTCPromisesHandler(stream, {
-                type: "audio",
-              });
-              console.log(recorder);
-              console.log("handle start recording");
-              recorder.startRecording();
+      async function handleStopRecording() {
+        await recorder.stopRecording();
+        let blob = await recorder.getBlob();
+
+        processAudio(blob);
+
+        stream = null;
+        recorder = null;
+      }
+
+      // See also https://github.com/aframevr/aframe/pull/4356
+      AFRAME.registerComponent("hide-in-ar-mode", {
+        // Set this object invisible while in AR mode.
+        init: function () {
+          this.el.sceneEl.addEventListener("enter-vr", (ev) => {
+            this.wasVisible = this.el.getAttribute("visible");
+            if (this.el.sceneEl.is("ar-mode")) {
+              this.el.setAttribute("visible", false);
+              // Backwards compatibility for Chrome 81's preliminary DOM Overlay API
+              document
+                .getElementById("overlay")
+                .classList.add("legacy-ar-mode");
             }
+          });
+          this.el.sceneEl.addEventListener("exit-vr", (ev) => {
+            if (this.wasVisible) this.el.setAttribute("visible", true);
+            // Backwards compatibility for Chrome 81's preliminary DOM Overlay API
+            document
+              .getElementById("overlay")
+              .classList.remove("legacy-ar-mode");
+          });
+        },
+      });
 
-            async function handleStopRecording() {
-
-              await recorder.stopRecording();
-              let blob = await recorder.getBlob();
-
-              processAudio(blob);
-
-              stream=null;
-              recorder=null;
+      AFRAME.registerComponent("ar-shadows", {
+        // Swap an object's material to a transparent shadows-only material while
+        // in AR mode. Intended for use with a ground plane.
+        schema: {
+          opacity: { default: 0.3 },
+        },
+        init: function () {
+          this.el.sceneEl.addEventListener("enter-vr", (ev) => {
+            console.log("session start", ev);
+            if (this.el.sceneEl.is("ar-mode")) {
+              console.log("AR session start", ev);
+              this.savedMaterial = this.el.object3D.children[0].material;
+              this.el.object3D.children[0].material =
+                new THREE.ShadowMaterial();
+              this.el.object3D.children[0].material.opacity = this.data.opacity;
             }
+          });
+          this.el.sceneEl.addEventListener("exit-vr", (ev) => {
+            console.log("session end", ev);
+            if (this.savedMaterial) {
+              this.el.object3D.children[0].material = this.savedMaterial;
+              this.savedMaterial = null;
+            }
+          });
+        },
+      });
 
-            // See also https://github.com/aframevr/aframe/pull/4356
-            AFRAME.registerComponent("hide-in-ar-mode", {
-              // Set this object invisible while in AR mode.
-              init: function () {
-                this.el.sceneEl.addEventListener("enter-vr", (ev) => {
-                  this.wasVisible = this.el.getAttribute("visible");
-                  if (this.el.sceneEl.is("ar-mode")) {
-                    this.el.setAttribute("visible", false);
-                    // Backwards compatibility for Chrome 81's preliminary DOM Overlay API
-                    document
-                      .getElementById("overlay")
-                      .classList.add("legacy-ar-mode");
-                  }
-                });
-                this.el.sceneEl.addEventListener("exit-vr", (ev) => {
-                  if (this.wasVisible) this.el.setAttribute("visible", true);
-                  // Backwards compatibility for Chrome 81's preliminary DOM Overlay API
-                  document
-                    .getElementById("overlay")
-                    .classList.remove("legacy-ar-mode");
-                });
-              },
+      AFRAME.registerComponent("xr-two-axis-controller", {
+        schema: {
+          deadZone: { default: 0 },
+        },
+        tick: function () {
+          let emit = (x, y) => {
+            let detail = { axis: [x, y, 0], changed: [0, 1] };
+            this.deflected = x != 0 || y != 0;
+            this.el.emit("axismove", detail, false);
+          };
+
+          let session = this.el.sceneEl.renderer.xr.getSession();
+          if (!session) return;
+          let inputs = session.inputSources;
+
+          for (let i = 0; i < inputs.length; ++i) {
+            let source = inputs[i];
+            //console.log('tick source=', source);
+            // Ignore screen touch.
+            if (source.targetRayMode == "screen") continue;
+            if (!source.gamepad || source.gamepad.axes.length < 2) continue;
+
+            have_input = true;
+            let x = source.gamepad.axes[0];
+            let y = source.gamepad.axes[1];
+            // Apply a dead zone to the controller axes.
+            if (Math.abs(x) < this.data.deadZone) x = 0;
+            if (Math.abs(y) < this.data.deadZone) y = 0;
+            //console.log('tick', vproj.x, vproj.y);
+            emit(x, y);
+          }
+        },
+      });
+
+      AFRAME.registerComponent("screen-controller", {
+        schema: {
+          deadZone: { default: 0 },
+        },
+        init: function () {
+          this.viewerSpace = null;
+          this.deflected = false;
+          console.log("this.el", this.el);
+          this.el.sceneEl.renderer.xr.addEventListener("sessionend", (ev) => {
+            console.log("sessionend", ev);
+            this.viewerSpace = null;
+          });
+          this.el.sceneEl.renderer.xr.addEventListener("sessionstart", (ev) => {
+            console.log("sessionstart", ev);
+
+            let session = this.el.sceneEl.renderer.xr.getSession();
+
+            // Get a 'viewer' reference space (attached to the phone) for use
+            // with screen space input.
+            session.requestReferenceSpace("viewer").then((space) => {
+              console.log("got viewer space", space);
+              this.viewerSpace = space;
             });
+          });
+        },
+        tick: function () {
+          if (!this.viewerSpace) return;
 
-            AFRAME.registerComponent("ar-shadows", {
-              // Swap an object's material to a transparent shadows-only material while
-              // in AR mode. Intended for use with a ground plane.
-              schema: {
-                opacity: { default: 0.3 },
-              },
-              init: function () {
-                this.el.sceneEl.addEventListener("enter-vr", (ev) => {
-                  console.log("session start", ev);
-                  if (this.el.sceneEl.is("ar-mode")) {
-                    console.log("AR session start", ev);
-                    this.savedMaterial = this.el.object3D.children[0].material;
-                    this.el.object3D.children[0].material =
-                      new THREE.ShadowMaterial();
-                    this.el.object3D.children[0].material.opacity = this.data.opacity;
-                  }
-                });
-                this.el.sceneEl.addEventListener("exit-vr", (ev) => {
-                  console.log("session end", ev);
-                  if (this.savedMaterial) {
-                    this.el.object3D.children[0].material = this.savedMaterial;
-                    this.savedMaterial = null;
-                  }
-                });
-              },
+          let emit = (x, y) => {
+            let detail = { axis: [x, y, 0], changed: [0, 1] };
+            this.deflected = x != 0 || y != 0;
+            this.el.emit("axismove", detail, false);
+          };
+
+          let session = this.el.sceneEl.renderer.xr.getSession();
+          if (!session) return;
+
+          // Ignore the XR screen input source if DOM Overlay is in use.
+          if (session.domOverlayState) return;
+
+          let inputs = session.inputSources;
+
+          let have_input = false;
+          for (let i = 0; i < inputs.length; ++i) {
+            let source = inputs[i];
+            //console.log('tick source=', source);
+            // Ignore inputs other than screen touch. Other controller types
+            // are handled separately.
+            if (source.targetRayMode != "screen") continue;
+
+            let frame = this.el.sceneEl.frame;
+
+            // Get a pose for the touch event in viewer space, this is locked to
+            // the phone and moves with the phone. This way, the input pose
+            // is relative to the virtual camera position. (For world interactions,
+            // we'd want to use local-floor space or similar.)
+            let inputPose = frame.getPose(
+              source.targetRaySpace,
+              this.viewerSpace
+            );
+
+            // Transform a point on the input space ray into viewer space. This is
+            // the transform matrix multiplied by a (0, 0, -1, 1) vector,
+            // equivalent to subtracting the Z axis basis vector (third column)
+            // from the ray origin in viewer space (fourth column).
+            //
+            // Using three.js:
+            //
+            //let inputMat = new THREE.Matrix4();
+            //inputMat.fromArray(inputPose.transform.matrix);
+            //let vvec = new THREE.Vector4(0, 0, -1, 1);
+            //vvec.applyMatrix4(inputMat);
+            //
+            // Equivalent unrolled version:
+            let m = inputPose.transform.matrix;
+            let vx = m[12] - m[8];
+            let vy = m[13] - m[9];
+            let vz = m[14] - m[10];
+            let vw = 1 - m[11];
+            let vvec = new THREE.Vector4(vx, vy, vz, vw);
+
+            // For debugging, move the cursor to the corresponding screen
+            // position. This is a 3D point, but the Z location doesn't matter as
+            // long as its projected location is where we want it to end up
+            // onscreen.
+            //let cursor = document.getElementById('cursor');
+            //cursor.setAttribute('position', vvec);
+
+            // Now apply the screen projection to get a NDC vector
+            // with x/y ranging from -1 to 1 covering the screen,
+            // so the bottom left screen corner is (-1, -1).
+            let viewerPose = frame.getViewerPose(this.viewerSpace);
+            let proj = new THREE.Matrix4();
+            proj.fromArray(viewerPose.views[0].projectionMatrix);
+            let vproj = vvec.applyMatrix4(proj);
+            vproj.divideScalar(vproj.w);
+
+            have_input = true;
+            // Apply a dead zone to the controller axes.
+            if (Math.abs(vproj.x) < this.data.deadZone) vproj.x = 0;
+            if (Math.abs(vproj.y) < this.data.deadZone) vproj.y = 0;
+            //console.log('tick', vproj.x, vproj.y);
+            emit(vproj.x, -vproj.y);
+          }
+
+          // If we haven't seen any screen input, make sure the virtual joystick
+          // returns to center if needed.
+          if (!have_input && this.deflected) {
+            emit(0, 0);
+          }
+        },
+      });
+
+      // This screen joystick uses a DIV with a draggable element.
+      // It works in 2D mode, or in WebXR immersive-ar when using
+      // DOM Overlay. (That currently requires a modified A-Frame
+      // which activates the feature, and enabling "WebXR DOM Overlay"
+      // or "WebXR Incubations" in chrome://flags.)
+      AFRAME.registerComponent("screen-joystick", {
+        init: function () {
+          this.emit = (x, y) => {
+            let detail = { axis: [x, y, 0], changed: [0, 1] };
+            //console.log('emit', x, y);
+            this.el.emit("axismove", detail, false);
+          };
+          this.controlsDiv = document.getElementById("controls");
+          this.controlStickDiv = document.getElementById("controlstick");
+          this.isRecording = false;
+
+          // Don't generate WebXR select events for interactions with the screen
+          // controls to avoid duplicate input. This is a new proposed API, it
+          // has no effect in current Chrome versions, but those don't generate
+          // any XR select events while the DOM overlay is active anyway. See
+          // https://immersive-web.github.io/dom-overlays/#onbeforexrselect
+          this.controlsDiv.addEventListener("beforexrselect", (ev) => {
+            console.log(ev.type, ev);
+            ev.preventDefault();
+          });
+
+          function clickHandler(ev) {
+            //console.log(ev.type, ev.offsetX, ev.offsetY);
+            //this.controlStickDiv.style.visibility = '';
+            if (this.isRecording) {
+              handleStopRecording();
+              this.isRecording = false;
+              console.log("---recording stopped---");
+            } else {
+              console.log("---recording---");
+              handleStartRecording();
+              this.isRecording = true;
+            }
+            console.log("setup click handlers");
+
+            this.controlStickDiv.addEventListener("click", clickHandler);
+          }
+        },
+
+        tick: function () {},
+      });
+
+      AFRAME.registerComponent("exit-ar-button", {
+        init: function () {
+          console.log("exit-ar-button init");
+          document
+            .getElementById("exitbutton")
+            .addEventListener("click", (ev) => {
+              console.log("exit-ar-button event " + ev.type);
+              this.el.sceneEl.renderer.xr.getSession().end();
             });
-
-            AFRAME.registerComponent("xr-two-axis-controller", {
-              schema: {
-                deadZone: { default: 0 },
-              },
-              tick: function () {
-                let emit = (x, y) => {
-                  let detail = { axis: [x, y, 0], changed: [0, 1] };
-                  this.deflected = x != 0 || y != 0;
-                  this.el.emit("axismove", detail, false);
-                };
-
-                let session = this.el.sceneEl.renderer.xr.getSession();
-                if (!session) return;
-                let inputs = session.inputSources;
-
-                for (let i = 0; i < inputs.length; ++i) {
-                  let source = inputs[i];
-                  //console.log('tick source=', source);
-                  // Ignore screen touch.
-                  if (source.targetRayMode == "screen") continue;
-                  if (!source.gamepad || source.gamepad.axes.length < 2) continue;
-
-                  have_input = true;
-                  let x = source.gamepad.axes[0];
-                  let y = source.gamepad.axes[1];
-                  // Apply a dead zone to the controller axes.
-                  if (Math.abs(x) < this.data.deadZone) x = 0;
-                  if (Math.abs(y) < this.data.deadZone) y = 0;
-                  //console.log('tick', vproj.x, vproj.y);
-                  emit(x, y);
-                }
-              },
-            });
-
-            AFRAME.registerComponent("screen-controller", {
-              schema: {
-                deadZone: { default: 0 },
-              },
-              init: function () {
-                this.viewerSpace = null;
-                this.deflected = false;
-                console.log("this.el", this.el);
-                this.el.sceneEl.renderer.xr.addEventListener("sessionend", (ev) => {
-                  console.log("sessionend", ev);
-                  this.viewerSpace = null;
-                });
-                this.el.sceneEl.renderer.xr.addEventListener("sessionstart", (ev) => {
-                  console.log("sessionstart", ev);
-
-                  let session = this.el.sceneEl.renderer.xr.getSession();
-
-                  // Get a 'viewer' reference space (attached to the phone) for use
-                  // with screen space input.
-                  session.requestReferenceSpace("viewer").then((space) => {
-                    console.log("got viewer space", space);
-                    this.viewerSpace = space;
-                  });
-                });
-              },
-              tick: function () {
-                if (!this.viewerSpace) return;
-
-                let emit = (x, y) => {
-                  let detail = { axis: [x, y, 0], changed: [0, 1] };
-                  this.deflected = x != 0 || y != 0;
-                  this.el.emit("axismove", detail, false);
-                };
-
-                let session = this.el.sceneEl.renderer.xr.getSession();
-                if (!session) return;
-
-                // Ignore the XR screen input source if DOM Overlay is in use.
-                if (session.domOverlayState) return;
-
-                let inputs = session.inputSources;
-
-                let have_input = false;
-                for (let i = 0; i < inputs.length; ++i) {
-                  let source = inputs[i];
-                  //console.log('tick source=', source);
-                  // Ignore inputs other than screen touch. Other controller types
-                  // are handled separately.
-                  if (source.targetRayMode != "screen") continue;
-
-                  let frame = this.el.sceneEl.frame;
-
-                  // Get a pose for the touch event in viewer space, this is locked to
-                  // the phone and moves with the phone. This way, the input pose
-                  // is relative to the virtual camera position. (For world interactions,
-                  // we'd want to use local-floor space or similar.)
-                  let inputPose = frame.getPose(
-                    source.targetRaySpace,
-                    this.viewerSpace
-                  );
-
-                  // Transform a point on the input space ray into viewer space. This is
-                  // the transform matrix multiplied by a (0, 0, -1, 1) vector,
-                  // equivalent to subtracting the Z axis basis vector (third column)
-                  // from the ray origin in viewer space (fourth column).
-                  //
-                  // Using three.js:
-                  //
-                  //let inputMat = new THREE.Matrix4();
-                  //inputMat.fromArray(inputPose.transform.matrix);
-                  //let vvec = new THREE.Vector4(0, 0, -1, 1);
-                  //vvec.applyMatrix4(inputMat);
-                  //
-                  // Equivalent unrolled version:
-                  let m = inputPose.transform.matrix;
-                  let vx = m[12] - m[8];
-                  let vy = m[13] - m[9];
-                  let vz = m[14] - m[10];
-                  let vw = 1 - m[11];
-                  let vvec = new THREE.Vector4(vx, vy, vz, vw);
-
-                  // For debugging, move the cursor to the corresponding screen
-                  // position. This is a 3D point, but the Z location doesn't matter as
-                  // long as its projected location is where we want it to end up
-                  // onscreen.
-                  //let cursor = document.getElementById('cursor');
-                  //cursor.setAttribute('position', vvec);
-
-                  // Now apply the screen projection to get a NDC vector
-                  // with x/y ranging from -1 to 1 covering the screen,
-                  // so the bottom left screen corner is (-1, -1).
-                  let viewerPose = frame.getViewerPose(this.viewerSpace);
-                  let proj = new THREE.Matrix4();
-                  proj.fromArray(viewerPose.views[0].projectionMatrix);
-                  let vproj = vvec.applyMatrix4(proj);
-                  vproj.divideScalar(vproj.w);
-
-                  have_input = true;
-                  // Apply a dead zone to the controller axes.
-                  if (Math.abs(vproj.x) < this.data.deadZone) vproj.x = 0;
-                  if (Math.abs(vproj.y) < this.data.deadZone) vproj.y = 0;
-                  //console.log('tick', vproj.x, vproj.y);
-                  emit(vproj.x, -vproj.y);
-                }
-
-                // If we haven't seen any screen input, make sure the virtual joystick
-                // returns to center if needed.
-                if (!have_input && this.deflected) {
-                  emit(0, 0);
-                }
-              },
-            });
-
-            // This screen joystick uses a DIV with a draggable element.
-            // It works in 2D mode, or in WebXR immersive-ar when using
-            // DOM Overlay. (That currently requires a modified A-Frame
-            // which activates the feature, and enabling "WebXR DOM Overlay"
-            // or "WebXR Incubations" in chrome://flags.)
-            AFRAME.registerComponent("screen-joystick", {
-              init: function () {
-                this.emit = (x, y) => {
-                  let detail = { axis: [x, y, 0], changed: [0, 1] };
-                  //console.log('emit', x, y);
-                  this.el.emit("axismove", detail, false);
-                };
-                this.controlsDiv = document.getElementById("controls");
-                this.controlStickDiv = document.getElementById("controlstick");
-                this.isRecording = false;
-
-                // Don't generate WebXR select events for interactions with the screen
-                // controls to avoid duplicate input. This is a new proposed API, it
-                // has no effect in current Chrome versions, but those don't generate
-                // any XR select events while the DOM overlay is active anyway. See
-                // https://immersive-web.github.io/dom-overlays/#onbeforexrselect
-                this.controlsDiv.addEventListener("beforexrselect", (ev) => {
-                  console.log(ev.type, ev);
-                  ev.preventDefault();
-                });
-
-                function clickHandler(ev) {
-                  //console.log(ev.type, ev.offsetX, ev.offsetY);
-                  //this.controlStickDiv.style.visibility = '';
-                  if (this.isRecording) {
-                    handleStopRecording();
-                    this.isRecording = false;
-                    console.log("---recording stopped---");
-                  } else {
-                    console.log("---recording---");
-                    handleStartRecording();
-                    this.isRecording = true;
-                  }
-                  console.log("setup click handlers");
-
-                  this.controlStickDiv.addEventListener("click", clickHandler);
-                }
-              },
-
-              tick: function () {},
-            });
-
-            AFRAME.registerComponent("exit-ar-button", {
-              init: function () {
-                console.log("exit-ar-button init");
-                document
-                  .getElementById("exitbutton")
-                  .addEventListener("click", (ev) => {
-                    console.log("exit-ar-button event " + ev.type);
-                    this.el.sceneEl.renderer.xr.getSession().end();
-                  });
-              },
-            });
+        },
+      });
     </script>
     <style>
       div.a-orientation-modal {
@@ -460,19 +459,7 @@
           /></a-entity>
         </a-camera>
 
-        <!--
-        <a-entity hand-controls="left" mixin="controller" car-controller-left></a-entity>
-        <a-entity hand-controls="right" mixin="controller" car-controller-right></a-entity>
-        -->
-        <a-entity
-          screen-controller="deadZone: 0.1"
-          car-controller-two-axis
-        ></a-entity>
-        <a-entity screen-joystick car-controller-two-axis></a-entity>
-        <a-entity
-          xr-two-axis-controller="deadZone: 0.1"
-          car-controller-two-axis
-        ></a-entity>
+      
         <a-entity exit-ar-button></a-entity>
       </a-entity>
 
@@ -490,7 +477,9 @@
         target="#car"
         position="-5 3 1.5"
       ></a-light>
-      <a-gltf-model gltf-model="#character" position="0 0 -2"></a-gltf-model>
+
+      <a-entity gltf-model="#character" position="0 0 0"></a-entity>
+
       <a-plane
         src="#ground"
         height="200"
