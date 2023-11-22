@@ -1,6 +1,6 @@
 <html>
   <head>
-    <title>RC car for VR/AR</title>
+    <title>Holonexr AR/VR Assistant</title>
     <style>
       body {
         font-family: helvetica, arial, sans-serif;
@@ -39,7 +39,10 @@
         display: initial;
       }
     </style>
-
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css"
+    />
     <script src="script.js"></script>
 
     <script>
@@ -443,15 +446,15 @@
         display: none;
       }
       div#controls {
-        width: 96px;
-        height: 96px;
-        background-color: rgba(255, 255, 255, 0.2);
-        position: absolute;
-        right: 70px;
-        bottom: 70px;
-        z-index: 1;
-        touch-action: none;
-        border-radius: 50%;
+      width: 96px;
+          height: 96px;
+          background-color: #212740;
+          position: absolute;
+          right: calc(50% - 48px);
+          bottom: 4rem;
+          z-index: 1;
+          touch-action: none;
+          border-radius: 50%;
       }
       div#controlstick {
         width: 50px;
@@ -460,14 +463,19 @@
         left: 23px;
         top: 23px;
         border-radius: 50%;
-        background-color: rgba(255, 170, 0, 0.5);
+        background-color:#ffffff;
+        display:flex;
+        align-items:center;
+        justify-content:center;
       }
     </style>
   </head>
   <body>
     <div id="overlay">
       <div id="controls">
-        <div id="controlstick"></div>
+        <div id="controlstick">
+          <i class="fa fa-microphone" style="font-size: 24px"></i>
+        </div>
       </div>
       <div id="exitbutton">Exit AR</div>
     </div>
@@ -482,9 +490,12 @@
         />
         <img
           id="bg"
-          src="ihttps://cdn.glitch.global/e8320cf5-79bd-4647-b21e-04b8b77f9f26/bg.jpg?v=1700634394047"
+          src="https://cdn.glitch.global/e8320cf5-79bd-4647-b21e-04b8b77f9f26/bg.jpg?v=1700634394047"
         />
-        <a-asset-item id="character" src="https://holonext.blob.core.windows.net/holonext-public-container/public_assets/demo-assets/character.glb"></a-asset-item>
+        <a-asset-item
+          id="character"
+          src="https://holonext.blob.core.windows.net/holonext-public-container/public_assets/demo-assets/character.glb"
+        ></a-asset-item>
         <a-mixin id="controller" tracked-controls="autoHide: false" />
       </a-assets>
 
@@ -532,7 +543,7 @@
         target="#car"
         position="-5 3 1.5"
       ></a-light>
-      <a-gltf-model gltf-model="#character"></a-gltf-model>
+      <a-gltf-model gltf-model="#character" position="0 0 -2"></a-gltf-model>
       <a-plane
         src="#ground"
         height="200"
@@ -551,29 +562,5 @@
            shadowCameraVisible: true;
       -->
     </a-scene>
-    <div id="text">
-      <h1>RC car for VR/AR</h1>
-
-      <p>
-        Based on
-        <a href="https://github.com/dala00/a-frame-car-sample"
-          >dala00's A-Frame RC car</a
-        >
-      </p>
-
-      <p>
-        Source:
-        <a href="https://github.com/klausw/a-frame-car-sample">Github</a>
-      </p>
-
-      <p>
-        To try WebXR's experimental AR mode, use an
-        <a href="https://developers.google.com/ar/discover/supported-devices"
-          >ARCore-compatible</a
-        >
-        Android phone with Chrome v79+ and enable <b>WebXR AR Module</b> in
-        chrome://flags.
-      </p>
-    </div>
   </body>
 </html>
