@@ -1,64 +1,30 @@
-<html>
+  <!DOCTYPE html>
+  <html>
+
   <head>
-    <title>Holonexr AR/VR Assistant</title>
-    <style>
-      body {
-        font-family: helvetica, arial, sans-serif;
-        margin: 2em;
-      }
-
-      h1 {
-        font-size: 1.35em;
-      }
-      div#text {
-        position: absolute;
-        left: 6px;
-        top: 6px;
-        padding: 6px;
-        max-width: 300px;
-        background-color: rgba(255, 255, 255, 0.7);
-        z-index: 2;
-      }
-      #exitbutton {
-        position: absolute;
-        left: 20px;
-        bottom: 20px;
-        padding: 6px;
-        border: 1px solid rgba(255, 255, 255, 0.5);
-        color: rgba(255, 255, 255, 0.8);
-        background-color: rgba(0, 0, 0, 0.2);
-        display: none;
-        z-index: 2;
-      }
-      #overlay.legacy-ar-mode,
-      :xr-overlay {
-        user-select: none;
-      }
-      #overlay.legacy-ar-mode #exitbutton,
-      :xr-overlay #exitbutton {
-        display: initial;
-      }
-    </style>
-    <link
-      rel="stylesheet"
-      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css"
-    />
     <script
-      src="https://cdnjs.cloudflare.com/ajax/libs/axios/1.6.2/axios.min.js"
-      integrity="sha512-b94Z6431JyXY14iSXwgzeZurHHRNkLt9d6bAHt7BZT38eqV+GyngIi/tVye4jBKPYQ2lBdRs0glww4fmpuLRwA=="
-      crossorigin="anonymous"
-      referrerpolicy="no-referrer"
-    ></script>
+      src="https://cdn.jsdelivr.net/gh/aframevr/aframe@f322d237cb6be356661a2334dfdf7459da6885c4/dist/aframe-master.min.js"></script>
     <script src="https://www.WebRTC-Experiment.com/RecordRTC.js"></script>
-    <script src="script.js"></script>
-
+      <script src="https://unpkg.com/aframe-extras/dist/aframe-extras.min.js"></script>
+    <script src="anchor-grabbed-entity.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/1.6.2/axios.min.js"
+      integrity="sha512-b94Z6431JyXY14iSXwgzeZurHHRNkLt9d6bAHt7BZT38eqV+GyngIi/tVye4jBKPYQ2lBdRs0glww4fmpuLRwA=="
+      crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     <script>
+      var questionLine = "Grab Mic To Talk"
+      var answerLine = "Release The Mic When You Done Recording"
+    </script>
+    <script>window.activeGrabbingHand = null;</script>
+    <script>
+      let isRecordingInProgress = false;
+
       const SERVER_URL = window.location.origin.includes("localhost")
         ? "http://localhost:5000"
-        : "https://holonext-ai-assistant.onrender.com";
+        : "https://holonext-ai-asistant.onrender.com";
 
       async function processAudio(recordingBlob) {
         console.log("Processing audio...");
+        updateText('Processing Your Record');
 
         const formData = new FormData();
         formData.append("audio", recordingBlob);
@@ -74,7 +40,10 @@
             }
           );
           console.log("Speech to text response:", response);
-          getChatGPTResponse({ transcript: response.data.text });
+          questionLine = response.data.text
+          answerLine = "Generating Your Answer"
+          updateTextContent(questionLine,answerLine)
+          await getChatGPTResponse({ transcript: response.data.text });
         } catch (error) {
           console.log("error", error);
         }
@@ -82,13 +51,18 @@
 
       const getChatGPTResponse = async ({ transcript }) => {
         console.log("Sending transcript to chat API:", transcript);
+        updateText('Generating Answer');
         try {
           const response = await axios.post(`${SERVER_URL}/api/chat`, {
             message: transcript,
+            voiceType: "alloy"
           });
 
           const answer = response.data.answer || "How can ı help you?";
           const answerAudio = response.data.audio;
+
+          answerLine = answer
+          updateTextContent(questionLine,answerLine)
 
           console.log("Chat API response:", response);
           console.log("Answer:", answer);
@@ -100,17 +74,37 @@
             type: "audio/mpeg",
           });
 
-          const audioElement = document.getElementById("sound");
+          // Create an audio element dynamically
+          const audioElement = document.createElement('audio');
+          audioElement.id = 'sound';
+          document.body.appendChild(audioElement);
+          audioElement.setAttribute('src', URL.createObjectURL(audioData));
 
-          console.log(audioElement);
-          const loader = document.querySelector(".loader-container");
-          loader.style.display = "none";
+          // Event listener for when audio playback ends
+          audioElement.addEventListener('ended', () => {
+            console.log('Audio playback ended');
+            // Change visibility of the model
+            const micBox = document.getElementById('micBox');
+            const mutBox = document.getElementById('mutBox');
+            if (micBox) {
+              //updateText("Grab Mic To Talk")
+              micBox.setAttribute('grabbable', '')
+              playAnimation('Idle')
+            }
+          });
+          updateText('Playing Answer');
+          playAnimation('Talk')
+          //playAnimation('Mouth')
+          audioElement.play().catch(e => console.error('Error playing audio:', e));
+          
+          //const audioElement = document.getElementById("sound");
 
-          audioElement.setAttribute(
-            "src",
-            `url(${URL.createObjectURL(audioData)})`
-          );
-          audioElement.play();
+          //console.log(audioElement);
+          //const loader = document.querySelector(".loader-container");
+          //loader.style.display = "none";
+
+          //audioElement.setAttribute("src",`url(${URL.createObjectURL(audioData)})`);
+          //audioElement.play();
         } catch (error) {
           console.log("error", error);
         }
@@ -118,7 +112,15 @@
 
       let stream, recorder;
 
+      function updateText(newText) {
+        /* var textEntity = document.querySelector('#dynamicText');
+        textEntity.setAttribute('text', `value: ${newText}; align: center; width: 4`); */
+
+      }
+
       async function handleStartRecording() {
+        updateText("Release Mic To Stop Recording")
+        //updateTabletText('Release Mic To Stop Recording');
         console.log("Starting recording...");
         stream = await navigator.mediaDevices.getUserMedia({
           video: false,
@@ -132,524 +134,817 @@
         recorder.startRecording();
       }
 
+
+
+      AFRAME.registerComponent("anchor-grab-entity", {
+          init: function () {
+            console.log('anchor-grab-entity initialized on', this.el.id);
+
+            this.el.addEventListener("grabstarted", this.deleteAnchor.bind(this));
+            this.el.addEventListener("grabended", this.updateAnchor.bind(this));
+          },
+
+          updateAnchor: function (evt) {
+            var grabbedEl = evt.detail.grabbedEl;
+            console.log(grabbedEl)
+            console.log("check")
+            var anchoredComponent = grabbedEl.components.anchored;
+            if (anchoredComponent) {
+              anchoredComponent.createAnchor(
+                grabbedEl.object3D.position,
+                grabbedEl.object3D.quaternion
+              );
+            }
+          },
+
+          deleteAnchor: function (evt) {
+            evt.preventDefault();
+            var grabbedEl = evt.detail.grabbedEl;
+            console.log(grabbedEl)
+            var anchoredComponent = grabbedEl.components.anchored;
+            if (anchoredComponent) {
+              anchoredComponent.deleteAnchor();
+            }
+          },
+        });
+
+        
+        AFRAME.registerComponent('hand-state-updater', {
+         init: function () {
+        this.el.addEventListener('grabstarted', () => {
+            window.activeGrabbingHand = this.el;
+        });
+        this.el.addEventListener('grabended', () => {
+            window.activeGrabbingHand = null;
+        });
+    }
+});
+        
+
+      function playAnimation(clipName) {
+        console.log("geldi",clipName)
+        const model = document.getElementById('rigtestchar');
+        const tempModel = document.getElementById('recordButton')
+        console.log(tempModel)
+        if(clipName == "talk"){
+          model.setAttribute('animation-mixer', `clip: ${clipName}; loop: repeat; crossFadeDuration: 0.5`);
+        }
+        else{
+          model.setAttribute('animation-mixer', `clip: ${clipName}; loop: repeat; crossFadeDuration: 0.5`);
+        }
+        
+      }
+
+      function stopAnimation() {
+        const model = document.getElementById('apainting');
+        model.setAttribute('animation-mixer', 'clip: *; timeScale: 0');
+      }
+
+      document.addEventListener('DOMContentLoaded', () => {
+      const scene = document.querySelector('a-scene');
+      if (!scene.hasLoaded) {
+        scene.addEventListener('loaded', setupGrabListeners);
+      } else {
+        setupGrabListeners();
+      }
+    });
+
+    function setupGrabListeners() {
+      // Assuming 'planeTotal' is the ID of the entity you're interested in
+      const planeTotal = document.getElementById('planeTotal');
+      console.log("setup finished")
+
+      // Replace 'grab-start' with the correct event name for your grabbing system
+      planeTotal.addEventListener('grabstarted', (evt) => {
+        console.log("grab done")
+        if (!window.activeGrabbingHand) return;
+
+        // Calculate and log the relative position
+        calculateAndLogRelativePosition(planeTotal, window.activeGrabbingHand);
+      });
+    }
+
+    function calculateAndLogRelativePosition(targetEl, handEl) {
+      const handPositionWorld = new THREE.Vector3();
+      handEl.object3D.getWorldPosition(handPositionWorld);
+
+      const relativePosition = targetEl.object3D.worldToLocal(handPositionWorld.clone());
+      console.log('Relative Position of Hand on planeTotal:', relativePosition);
+    }
+
+      document.addEventListener('DOMContentLoaded', () => {
+      
+        const grabbableElements = document.querySelectorAll('[anchor-grabbed-entity]');
+        const recordButton = document.getElementById('recordButton');
+        console.log('Initial RecordButton state:', recordButton.getAttribute('grabbable'));
+      
+        grabbableElements.forEach(el => {
+          el.addEventListener('grabstarted', (evt) => {
+            console.log(el)
+            console.log(evt)
+            const grabbedElement = evt.detail.grabbedEl; // Get the grabbed element
+            console.log(grabbedElement.getAttribute('scale').x)
+            console.log("Grab Started on element:", grabbedElement.id);
+            // Log the state of the grabbable component
+            console.log('Grabbable state:', evt.detail.grabbedEl.getAttribute('grabbable'));
+
+            var firstPosition = document.getElementById('mic').object3D.position
+            var secondPosition = document.getElementById('mut').object3D.position
+            
+            if(grabbedElement.id == "micBox"){
+              console.log("geldi")
+              if (!isRecordingInProgress) {
+                updateText('Start Talking. Release Mic To Stop');
+                console.log("Record Button grabbed");
+                handleStartRecording().then(() => {
+                  document.getElementById('mic').setAttribute('visible', false);
+                  document.getElementById('micyellow').setAttribute('visible', true); // Change color on grab
+                  isRecordingInProgress = true;
+                });
+
+              }
+            }
+
+            if(grabbedElement.id == "mutBox"){
+              console.log("geldi2")
+              if (!isRecordingInProgress) {
+                updateText('Start Talking. Release Mic To Stop');
+                console.log("Record Button grabbed");
+                handleStartRecording().then(() => {
+                  document.getElementById('mut').setAttribute('visible', false);
+                  //document.getElementById('mutred').setAttribute('visible', true); 
+                  isRecordingInProgress = true;
+                });
+
+              }
+            }
+          });
+
+          el.addEventListener('grabended', (evt) => {
+            const releasedElement = evt.detail.grabbedEl; // Get the released element
+            console.log("Grab Ended on elements:", releasedElement.id);
+            // Log the state of the grabbable component
+            console.log('Grabbable state:', evt.detail.grabbedEl.getAttribute('grabbable'));
+            //document.getElementById('mut').setAttribute('visible', true);
+
+            if (releasedElement.id == "micBox" && isRecordingInProgress) {
+              handleStopRecording().then(() => {
+                isRecordingInProgress = false;
+                releasedElement.removeAttribute('grabbable')
+                document.getElementById('mic').setAttribute('visible', true); 
+                document.getElementById('micyellow').setAttribute('visible', false); 
+              });
+            }
+            if (releasedElement.id == "mutBox" && isRecordingInProgress) {
+              handleStopRecording().then(() => {
+                isRecordingInProgress = false;
+                releasedElement.removeAttribute('grabbable')
+                //document.getElementById('mut').setAttribute('visible', true); 
+                document.getElementById('mutred').setAttribute('visible', false); 
+              });
+            }
+          });
+        });
+
+        // Add click event for PC browser interactions
+        recordButton.addEventListener('mouseup', (evt) => {
+          console.log('mouse-up')
+          playAnimation('Idle');
+          printModelTransformations('recordButton'); 
+          if (isRecordingInProgress) {
+            recordButton.setAttribute('visible', false);
+            handleStopRecording().then(() => {
+              isRecordingInProgress = false;
+              recordButton.setAttribute('material', 'color', 'green'); // Revert color on release
+            });
+          }
+        });
+
+        // Add touchstart event for mobile touch interactions
+        recordButton.addEventListener('touchstart', (evt) => {
+          console.log('touch-started')
+          if (isRecordingInProgress) {
+            recordButton.setAttribute('visible', false);
+            handleStopRecording().then(() => {
+              isRecordingInProgress = false;
+              recordButton.setAttribute('material', 'color', 'green'); // Revert color on release
+            });
+          }
+
+        });
+
+        recordButton.addEventListener('mousedown', (evt) => {
+          console.log('mouse-down')
+          if (!isRecordingInProgress) {
+            updateText('Start Talking. Release Mic To Stop');
+            console.log("Record Button grabbed");
+            handleStartRecording().then(() => {
+              recordButton.setAttribute('material', 'color', 'red'); // Change color on grab
+              isRecordingInProgress = true;
+            });
+
+          }
+        });
+
+        // Add touchstart event for mobile touch interactions
+        recordButton.addEventListener('touchended', (evt) => {
+          console.log('touch-ended')
+
+          if (!isRecordingInProgress) {
+            updateText('Start Talking. Release Mic To Stop');
+            console.log("Record Button grabbed");
+            handleStartRecording().then(() => {
+              recordButton.setAttribute('material', 'color', 'red'); // Change color on grab
+              isRecordingInProgress = true;
+            });
+
+          }
+        });
+      });
+
+
       async function handleStopRecording() {
         console.log("Stopping recording...");
-        const loader = document.querySelector(".loader-container");
-        loader.style.display = "flex";
+        //const loader = document.querySelector(".loader-container");
+        //loader.style.display = "flex";
         await recorder.stopRecording();
         let blob = await recorder.getBlob();
         stream.stop();
         console.log("send data to procesess aduio function", blob);
-        processAudio(blob);
+        updateText('Processing Your Sound');
+        await processAudio(blob); 
 
         stream = null;
         recorder = null;
       }
 
-      // See also https://github.com/aframevr/aframe/pull/4356
-      AFRAME.registerComponent("hide-in-ar-mode", {
-        // Set this object invisible while in AR mode.
-        init: function () {
-          this.el.sceneEl.addEventListener("enter-vr", (ev) => {
-            this.wasVisible = this.el.getAttribute("visible");
-            if (this.el.sceneEl.is("ar-mode")) {
-              this.el.setAttribute("visible", false);
-              // Backwards compatibility for Chrome 81's preliminary DOM Overlay API
-              document
-                .getElementById("overlay")
-                .classList.add("legacy-ar-mode");
-            }
-          });
-          this.el.sceneEl.addEventListener("exit-vr", (ev) => {
-            if (this.wasVisible) this.el.setAttribute("visible", true);
-            // Backwards compatibility for Chrome 81's preliminary DOM Overlay API
-            document
-              .getElementById("overlay")
-              .classList.remove("legacy-ar-mode");
-          });
-        },
-      });
+      AFRAME.registerComponent('lock-position', {
+    init: function () {
+        // Store the initial position
+        this.initialPosition = this.el.object3D.position.clone();
+        this.initialRotation = this.el.object3D.rotation.clone();
 
-      AFRAME.registerComponent("ar-shadows", {
-        // Swap an object's material to a transparent shadows-only material while
-        // in AR mode. Intended for use with a ground plane.
-        schema: {
-          opacity: { default: 0.3 },
-        },
-        init: function () {
-          this.el.sceneEl.addEventListener("enter-vr", (ev) => {
-            console.log("session start", ev);
-            if (this.el.sceneEl.is("ar-mode")) {
-              console.log("AR session start", ev);
-              this.savedMaterial = this.el.object3D.children[0].material;
-              this.el.object3D.children[0].material =
-                new THREE.ShadowMaterial();
-              this.el.object3D.children[0].material.opacity = this.data.opacity;
-            }
-          });
-          this.el.sceneEl.addEventListener("exit-vr", (ev) => {
-            console.log("session end", ev);
-            if (this.savedMaterial) {
-              this.el.object3D.children[0].material = this.savedMaterial;
-              this.savedMaterial = null;
-            }
-          });
-        },
-      });
+        // Bind event listeners
+        this.handleGrabStart = this.handleGrabStart.bind(this);
+        this.el.addEventListener('grabstarted', this.handleGrabStart);
+    },
 
-      AFRAME.registerComponent("xr-two-axis-controller", {
+    handleGrabStart: function () {
+        console.log("debug")
+        // Immediately reset the position when grab starts
+        this.el.object3D.position.copy(this.initialPosition);
+        this.el.object3D.rotation.copy(this.initialRotation);
+    },
+
+    tick: function () {
+        // Continuously reset the position to the initial position
+        this.el.object3D.position.copy(this.initialPosition);
+        this.el.object3D.rotation.copy(this.initialRotation);
+    },
+
+    remove: function () {
+        // Remove event listener when the component is removed
+        console.log("debug")
+        this.el.removeEventListener('grabended', this.handleGrabStart);
+    }
+});
+
+
+
+      AFRAME.registerComponent('follow-button', {
         schema: {
-          deadZone: { default: 0 },
+          target: { type: 'selector' },
+          xOffset: { type: 'number', default: 0 },
+          yOffset: { type: 'number', default: 0 },
+          zOffset: { type: 'number', default: 0 }
         },
+
         tick: function () {
-          let emit = (x, y) => {
-            let detail = { axis: [x, y, 0], changed: [0, 1] };
-            this.deflected = x != 0 || y != 0;
-            this.el.emit("axismove", detail, false);
-          };
-
-          let session = this.el.sceneEl.renderer.xr.getSession();
-          if (!session) return;
-          let inputs = session.inputSources;
-
-          for (let i = 0; i < inputs.length; ++i) {
-            let source = inputs[i];
-            //console.log('tick source=', source);
-            // Ignore screen touch.
-            if (source.targetRayMode == "screen") continue;
-            if (!source.gamepad || source.gamepad.axes.length < 2) continue;
-
-            have_input = true;
-            let x = source.gamepad.axes[0];
-            let y = source.gamepad.axes[1];
-            // Apply a dead zone to the controller axes.
-            if (Math.abs(x) < this.data.deadZone) x = 0;
-            if (Math.abs(y) < this.data.deadZone) y = 0;
-            //console.log('tick', vproj.x, vproj.y);
-            emit(x, y);
-          }
-        },
-      });
-
-      AFRAME.registerComponent("screen-controller", {
-        schema: {
-          deadZone: { default: 0 },
-        },
-        init: function () {
-          this.viewerSpace = null;
-          this.deflected = false;
-          console.log("this.el", this.el);
-          this.el.sceneEl.renderer.xr.addEventListener("sessionend", (ev) => {
-            console.log("sessionend", ev);
-            this.viewerSpace = null;
-          });
-          this.el.sceneEl.renderer.xr.addEventListener("sessionstart", (ev) => {
-            console.log("sessionstart", ev);
-
-            let session = this.el.sceneEl.renderer.xr.getSession();
-
-            // Get a 'viewer' reference space (attached to the phone) for use
-            // with screen space input.
-            session.requestReferenceSpace("viewer").then((space) => {
-              console.log("got viewer space", space);
-              this.viewerSpace = space;
-            });
-          });
-        },
-        tick: function () {
-          if (!this.viewerSpace) return;
-
-          let emit = (x, y) => {
-            let detail = { axis: [x, y, 0], changed: [0, 1] };
-            this.deflected = x != 0 || y != 0;
-            this.el.emit("axismove", detail, false);
-          };
-
-          let session = this.el.sceneEl.renderer.xr.getSession();
-          if (!session) return;
-
-          // Ignore the XR screen input source if DOM Overlay is in use.
-          if (session.domOverlayState) return;
-
-          let inputs = session.inputSources;
-
-          let have_input = false;
-          for (let i = 0; i < inputs.length; ++i) {
-            let source = inputs[i];
-            //console.log('tick source=', source);
-            // Ignore inputs other than screen touch. Other controller types
-            // are handled separately.
-            if (source.targetRayMode != "screen") continue;
-
-            let frame = this.el.sceneEl.frame;
-
-            // Get a pose for the touch event in viewer space, this is locked to
-            // the phone and moves with the phone. This way, the input pose
-            // is relative to the virtual camera position. (For world interactions,
-            // we'd want to use local-floor space or similar.)
-            let inputPose = frame.getPose(
-              source.targetRaySpace,
-              this.viewerSpace
+          var target = this.data.target;
+          if (target && target.object3D) {
+            var targetPosition = target.object3D.position;
+            var targetRotation = target.object3D.rotation;
+            this.el.object3D.position.set(
+              targetPosition.x + this.data.xOffset,
+              targetPosition.y + this.data.yOffset,
+              targetPosition.z + this.data.zOffset
             );
+            this.el.object3D.rotation.set(
 
-            // Transform a point on the input space ray into viewer space. This is
-            // the transform matrix multiplied by a (0, 0, -1, 1) vector,
-            // equivalent to subtracting the Z axis basis vector (third column)
-            // from the ray origin in viewer space (fourth column).
-            //
-            // Using three.js:
-            //
-            //let inputMat = new THREE.Matrix4();
-            //inputMat.fromArray(inputPose.transform.matrix);
-            //let vvec = new THREE.Vector4(0, 0, -1, 1);
-            //vvec.applyMatrix4(inputMat);
-            //
-            // Equivalent unrolled version:
-            let m = inputPose.transform.matrix;
-            let vx = m[12] - m[8];
-            let vy = m[13] - m[9];
-            let vz = m[14] - m[10];
-            let vw = 1 - m[11];
-            let vvec = new THREE.Vector4(vx, vy, vz, vw);
-
-            // For debugging, move the cursor to the corresponding screen
-            // position. This is a 3D point, but the Z location doesn't matter as
-            // long as its projected location is where we want it to end up
-            // onscreen.
-            //let cursor = document.getElementById('cursor');
-            //cursor.setAttribute('position', vvec);
-
-            // Now apply the screen projection to get a NDC vector
-            // with x/y ranging from -1 to 1 covering the screen,
-            // so the bottom left screen corner is (-1, -1).
-            let viewerPose = frame.getViewerPose(this.viewerSpace);
-            let proj = new THREE.Matrix4();
-            proj.fromArray(viewerPose.views[0].projectionMatrix);
-            let vproj = vvec.applyMatrix4(proj);
-            vproj.divideScalar(vproj.w);
-
-            have_input = true;
-            // Apply a dead zone to the controller axes.
-            if (Math.abs(vproj.x) < this.data.deadZone) vproj.x = 0;
-            if (Math.abs(vproj.y) < this.data.deadZone) vproj.y = 0;
-            //console.log('tick', vproj.x, vproj.y);
-            emit(vproj.x, -vproj.y);
-          }
-
-          // If we haven't seen any screen input, make sure the virtual joystick
-          // returns to center if needed.
-          if (!have_input && this.deflected) {
-            emit(0, 0);
-          }
-        },
-      });
-
-      // This screen joystick uses a DIV with a draggable element.
-      // It works in 2D mode, or in WebXR immersive-ar when using
-      // DOM Overlay. (That currently requires a modified A-Frame
-      // which activates the feature, and enabling "WebXR DOM Overlay"
-      // or "WebXR Incubations" in chrome://flags.)
-      AFRAME.registerComponent("screen-joystick", {
-        init: function () {
-          this.emit = (x, y) => {
-            let detail = { axis: [x, y, 0], changed: [0, 1] };
-            //console.log('emit', x, y);
-            this.el.emit("axismove", detail, false);
-          };
-          this.controlsDiv = document.getElementById("controls");
-          this.controlStickDiv = document.getElementById("controlstick");
-          this.isRecording = false;
-
-          // Don't generate WebXR select events for interactions with the screen
-          // controls to avoid duplicate input. This is a new proposed API, it
-          // has no effect in current Chrome versions, but those don't generate
-          // any XR select events while the DOM overlay is active anyway. See
-          // https://immersive-web.github.io/dom-overlays/#onbeforexrselect
-          this.controlsDiv.addEventListener("beforexrselect", (ev) => {
-            console.log(ev.type, ev);
-            ev.preventDefault();
-          });
-
-          function clickHandler(ev) {
-            //console.log(ev.type, ev.offsetX, ev.offsetY);
-            //this.controlStickDiv.style.visibility = '';
-            if (this.isRecording) {
-              handleStopRecording();
-              this.isRecording = false;
-              console.log("---recording stopped---");
-            } else {
-              console.log("---recording---");
-              handleStartRecording();
-              this.isRecording = true;
-            }
-            console.log("setup click handlers");
-
-            this.controlStickDiv.addEventListener("click", clickHandler);
-          }
-        },
-
-        tick: function () {},
-      });
-      /* global AFRAME */
-      AFRAME.registerComponent("anchor-grabbed-entity", {
-        init: function () {
-          this.el.addEventListener("grabstarted", this.deleteAnchor.bind(this));
-          this.el.addEventListener("grabended", this.updateAnchor.bind(this));
-        },
-
-        updateAnchor: function (evt) {
-          var grabbedEl = evt.detail.grabbedEl;
-          var anchoredComponent = grabbedEl.components.anchored;
-          if (anchoredComponent) {
-            anchoredComponent.createAnchor(
-              grabbedEl.object3D.position,
-              grabbedEl.object3D.quaternion
+              this.el.object3D.rotation.x,
+              targetRotation.y, // Keep original y rotation
+              this.el.object3D.rotation.z
             );
           }
+        }
+      });
+
+      AFRAME.registerComponent('follow-text', {
+        schema: {
+          target: { type: 'selector' },
+          xOffset: { type: 'number', default: 0 },
+          yOffset: { type: 'number', default: 0 },
+          zOffset: { type: 'number', default: 0 }
         },
 
-        deleteAnchor: function (evt) {
-          var grabbedEl = evt.detail.grabbedEl;
-          var anchoredComponent = grabbedEl.components.anchored;
-          if (anchoredComponent) {
-            anchoredComponent.deleteAnchor();
+        tick: function () {
+          var target = this.data.target;
+          if (target && target.object3D) {
+            var targetPosition = target.object3D.position;
+            var targetRotation = target.object3D.rotation;
+            this.el.object3D.position.set(
+              targetPosition.x + this.data.xOffset,
+              targetPosition.y + this.data.yOffset,
+              targetPosition.z + this.data.zOffset
+            );
+            this.el.object3D.rotation.set(
+              this.el.object3D.rotation.x,
+              targetRotation.y, // Keep original y rotation
+              this.el.object3D.rotation.z
+            );
           }
-        },
-      });
-      AFRAME.registerComponent("chat-button", {
-        init: function () {
-          let isRecording = false;
-
-          function clickHandler() {
-            //console.log(ev.type, ev.offsetX, ev.offsetY);
-            //this.controlStickDiv.style.visibility = '';
-            if (isRecording) {
-              handleStopRecording();
-              isRecording = false;
-              console.log("---recording stopped---");
-            } else {
-              console.log("---recording---");
-              handleStartRecording();
-              isRecording = true;
-            }
-          }
-          this.el.addEventListener("pointerdown", clickHandler);
-          // this.el.addEventListener("click", clickHandler);
-        },
+        }
       });
 
-      AFRAME.registerComponent("exit-ar-button", {
-        init: function () {
-          console.log("exit-ar-button init");
-          document
-            .getElementById("exitbutton")
-            .addEventListener("click", (ev) => {
-              console.log("exit-ar-button event " + ev.type);
-              this.el.sceneEl.renderer.xr.getSession().end();
-            });
-        },
-      });
+      AFRAME.registerComponent('scale-watcher', {
+        schema: {
+    x: {type: 'number', default: 1},
+    y: {type: 'number', default: 1},
+    z: {type: 'number', default: 1}
+  },
+
+  init: function() {
+    this.el.object3D.scale.set(this.data.x, this.data.y, this.data.z);
+  },
+
+  tick: function() {
+    // Constantly reset the scale to the specified value
+    this.el.object3D.scale.set(this.data.x, this.data.y, this.data.z);
+  }
+  });
+
+  AFRAME.registerComponent('calculate-relative-position', {
+    init: function () {
+        // Assuming 'grab-start' is the event emitted when grabbing starts.
+        // This might need to be adjusted based on your grab system.
+        this.el.addEventListener('grabstarted', (evt) => {
+            // Grabbing logic here
+
+            // Calculate the relative position of the hand to 'planeTotal'
+            const handPositionWorld = new THREE.Vector3(); // Placeholder for hand's world position
+            // Assuming evt.detail.handEl exists and contains the hand entity.
+            // You might need to adjust based on your actual event detail structure.
+            evt.detail.handEl.object3D.getWorldPosition(handPositionWorld);
+
+            const relativePosition = this.el.object3D.worldToLocal(handPositionWorld.clone());
+
+            console.log('Relative Position of Hand on planeTotal:', relativePosition);
+        });
+    }
+});
+
+      
+
+    /* AFRAME.registerComponent('hover', {
+    init: function () {
+      this.onCollisionStarted = this.onCollisionStarted.bind(this);
+      this.onCollisionEnded = this.onCollisionEnded.bind(this);
+      this.el.addEventListener('obbcollisionstarted', this.onCollisionStarted);
+      this.el.addEventListener('obbcollisionended', this.onCollisionEnded);
+    },
+
+    onCollisionStarted: function (evt) {
+        var withEl = evt.detail.withEl;
+        if (!withEl.classList.contains('hoverable')) { return; }  // Only respond to hoverable entities
+        console.log("Hover started on element:", withEl.id);
+    },
+
+    onCollisionEnded: function (evt) {
+        var withEl = evt.detail.withEl;
+        if (!withEl.classList.contains('hoverable')) { return; }  // Only respond to hoverable entities
+        console.log("Hover ended on element:", withEl.id);
+    }
+  }); */
+      
+      function printModelTransformations(modelId) {
+      const model = document.getElementById(modelId);
+
+      if (model) {
+          const position = model.object3D.position;
+          const rotation = model.object3D.rotation;
+          const scale = model.object3D.scale;
+
+          console.log(`Position: x=${position.x}, y=${position.y}, z=${position.z}`);
+          console.log(`Rotation: x=${rotation.x}, y=${rotation.y}, z=${rotation.z}`);
+          console.log(`Scale: x=${scale.x}, y=${scale.y}, z=${scale.z}`);
+      } else {
+          console.log('Model not found');
+      }
+  }
+
+  function updateTextContent(question, answer) {
+    // Update question text
+    const questionText = document.querySelector('#questionPlane a-text');
+    questionText.setAttribute('value', question);
+    fitTextToPlane(questionText, question);
+
+    // Update answer text
+    const answerText = document.querySelector('#answerPlane a-text');
+    answerText.setAttribute('value', answer);
+    fitTextToPlane(answerText, answer);
+  }
+  function fitTextToPlane(textEntity, text) {
+    const planeWidth = parseFloat(textEntity.getAttribute('width'));
+    const planeHeight = parseFloat(0.5);
+
+    // Dynamic scaling factors based on text length
+    const charWidthScaleFactor = calculateCharWidthScaleFactor(text.length);
+    const lineHeight = calculateDynamicFactor(text.length, planeHeight, 'lineHeight');
+
+    // Calculate wrap count based on dynamic scale factor
+    const wrapCount = Math.max(Math.floor(planeWidth / charWidthScaleFactor), 1);
+    // Estimate the number of lines the text might take up
+    const estimatedLines = Math.ceil(text.length / wrapCount);
+
+    // Calculate the maximum font size that fits within the plane height
+    const maxFontSize = planeHeight / (estimatedLines * lineHeight);
+
+    // Update the text entity attributes
+    textEntity.setAttribute('text', {
+        wrapCount: wrapCount,
+        width: planeWidth,
+        baseline: 'center',
+        anchor: 'center',
+        zOffset: 0.01,
+        height: maxFontSize,
+        value: text // Set the text content
+    });
+  }
+
+  function calculateDynamicFactor(textLength, planeDimension, type) {
+    // Define a base scale factor for your font and plane size
+    const baseFactor = 0.0001;
+
+    // Calculate a scaling ratio based on the text length
+    const scaleRatio = textLength;
+    console.log(textLength,planeDimension,type)
+    console.log(scaleRatio)
+
+    if (type === 'charWidth') {
+        // Calculate character width scale factor
+        return 0.04; // Adjust the multiplier as needed
+    } else if (type === 'lineHeight') {
+        // Calculate line height
+        return scaleRatio; // Adjust the multiplier as needed
+    } else {
+        return baseFactor; // Default fallback
+    }
+  }
+
+  function calculateCharWidthScaleFactor(textLength) {
+      // Constants for the power-law formula
+      // These would be determined by fitting your provided data points to a power-law relationship
+      const A = 0.2; // This is a constant that adjusts the scale factor
+      const B = -0.4; // This is the exponent in the power-law formula
+
+      // Calculate the charWidthScaleFactor using a power-law relationship
+      // charWidthScaleFactor = A * (textLength ^ B)
+      // Note: Math.pow() is used to raise textLength to the power of B
+      const charWidthScaleFactor = A * Math.pow(textLength, B);
+
+      // Ensure the charWidthScaleFactor is within a reasonable range
+      return Math.min(Math.max(charWidthScaleFactor, 0.015), 0.1);
+  }
+
+
+  function calculateMaxCharsPerLine(planeWidth, textEntity) {
+    // Define the scale based on your specific font and desired sizing
+    const charWidthScaleFactor = 0.01;
+    return planeWidth / charWidthScaleFactor;
+  }
+
+  function calculateMaxFontSize(estimatedLines, planeHeight) {
+    // Estimate the maximum font size to prevent vertical overflow
+    const lineHeight = 0.01; // Line height based on the specific font's characteristics
+    return Math.min(planeHeight / (estimatedLines * lineHeight), lineHeight);
+  }
+  // Example usage
+
+
     </script>
-    <style>
-      #overlay {
-        display: none;
-      }
-      div.a-orientation-modal {
-        display: none;
-      }
-      div#controls {
-        width: 96px;
-        height: 96px;
-        background-color: #212740;
-        position: absolute;
-        right: calc(50% - 48px);
-        bottom: 2rem;
-        z-index: 1;
-        touch-action: none;
-        border-radius: 50%;
-      }
-      #controlstick {
-        width: 50px;
-        height: 50px;
-        position: relative;
-        left: 23px;
-        top: 23px;
-        border-radius: 50%;
-        background-color: #ffffff;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-      }
-
-      .pulse {
-        animation: scale 2s infinite;
-      }
-
-      @keyframes scale {
-        0% {
-          transform: scale(1);
-        }
-        50% {
-          transform: scale(1.25);
-        }
-        100% {
-          transform: scale(1);
-        }
-      }
-
-      .loader-container {
-        display: none;
-        position: relative;
-        width: clamp(350px, 40%, 600px);
-        height: clamp(200px, 30%, 400px);
-        margin: auto;
-        border-radius: 6px;
-        top: 30%;
-        align-items: center;
-        flex-direction: column;
-        gap: 2rem;
-        justify-content: center;
-        background: white;
-        z-index: 100;
-      }
-
-      .loader {
-        width: 48px;
-        height: 48px;
-        border: 5px solid #fff;
-        border-bottom-color: #ff3d00;
-        border-radius: 50%;
-        display: inline-block;
-        box-sizing: border-box;
-        animation: rotation 1s linear infinite;
-      }
-
-      @keyframes rotation {
-        0% {
-          transform: rotate(0deg);
-        }
-        100% {
-          transform: rotate(360deg);
-        }
-      }
-    </style>
   </head>
-  <body>
-    <div class="loader-container">
-      <span class="loader"></span>
-      <p style="font-size: 14px">
-        Chat Response proccessing ,please wait a second...
-      </p>
-    </div>
 
-    <div id="overlay">
-      <div id="controls">
-        <button id="controlstick">
-          <i class="fa fa-microphone" style="font-size: 24px"></i>
-        </button>
-      </div>
-      <div id="exitbutton">Exit AR</div>
-    </div>
-    <a-scene
-      physics="debug: false"
-      obb-collider="showColliders: false"
-      renderer="colorManagement: true;"
-      xr-mode-ui="XRMode: ar"
-    >
-      <a-assets>
-        <img
-          id="ground"
-          src="https://cdn.glitch.global/e8320cf5-79bd-4647-b21e-04b8b77f9f26/block.png?v=1700634400103"
-        />
-        <img
-          id="bg"
-          src="https://cdn.glitch.global/e8320cf5-79bd-4647-b21e-04b8b77f9f26/bg.jpg?v=1700634394047"
-        />
-        <a-asset-item
-          id="character"
-          src="https://holonext.blob.core.windows.net/holonext-public-container/public_assets/demo-assets/character.glb"
-          response-type="arraybuffer"
-          crossorigin="anonymous"
-        ></a-asset-item>
-        <a-mixin id="controller" tracked-controls="autoHide: false" />
+  <body>
+    <a-scene physics="driver: ammo" raycaster="objects: .clickable" obb-collider="showColliders: false" renderer="colorManagement: true;" button xr-mode-ui="XRMode: ar"
+      info-message="htmlSrc: #messageText">
+      <a-assets timeout="10000">
+        <!-- Model by theGentleGiant https://sketchfab.com/3d-models/vintage-painting-dani-3fdd92904c2b44028bef28b33e897d9f -->
+        <a-asset-item id="norigchar"
+          src="https://cdn.glitch.global/b43aad67-87ae-4e45-8831-e783cd221e6f/norig-character.glb?v=1701273637085"
+          response-type="arraybuffer" crossorigin="anonymous"></a-asset-item>
+        <a-asset-item id="messageText" src="message.html"></a-asset-item>
       </a-assets>
 
+      
+     <!--  <a-assets timeout="10000">
+        <a-asset-item id="mic"
+          src="https://cdn.glitch.global/b43aad67-87ae-4e45-8831-e783cd221e6f/microphone.glb?v=1702047713741"
+          response-type="arraybuffer" crossorigin="anonymous"></a-asset-item>
+        <a-asset-item id="messageText2" src="message.html"></a-asset-item>
+      </a-assets> -->
+
+      <a-assets timeout="10000">
+        <!-- Model by theGentleGiant https://sketchfab.com/3d-models/vintage-painting-dani-3fdd92904c2b44028bef28b33e897d9f -->
+        <a-asset-item id="chartest"
+          src="https://cdn.glitch.global/63f1eb40-f41e-4c89-ab7f-5b5f6294c036/chartest.glb?v=1705936570115"
+          response-type="arraybuffer" crossorigin="anonymous"></a-asset-item>
+        <a-asset-item id="messageText3" src="message.html"></a-asset-item>
+      </a-assets>
+      <a-assets timeout="10000">
+        <!-- Model by theGentleGiant https://sketchfab.com/3d-models/vintage-painting-dani-3fdd92904c2b44028bef28b33e897d9f -->
+        <a-asset-item id="rigtest"
+          src="https://cdn.glitch.global/63f1eb40-f41e-4c89-ab7f-5b5f6294c036/c13.glb?v=1706010995927"
+          response-type="arraybuffer" crossorigin="anonymous"></a-asset-item>
+        <a-asset-item id="messageText3" src="message.html"></a-asset-item>
+      </a-assets>
+<!-- 
+      <a-assets timeout="10000">
+        <a-asset-item id="arabicchar"
+          src="https://cdn.glitch.global/63f1eb40-f41e-4c89-ab7f-5b5f6294c036/sauditest3.glb?v=1707916886600"
+          response-type="arraybuffer" crossorigin="anonymous"></a-asset-item>
+        <a-asset-item id="messageText3" src="message.html"></a-asset-item>
+      </a-assets>
+ -->
+
+      <a-assets>
+        <a-asset-item id="planeModel" src="https://cdn.glitch.global/63f1eb40-f41e-4c89-ab7f-5b5f6294c036/bgnew.glb?v=1706017520148"></a-asset-item>
+    </a-assets>
+
+    <a-assets timeout="10000">
+      <!-- Model by theGentleGiant https://sketchfab.com/3d-models/vintage-painting-dani-3fdd92904c2b44028bef28b33e897d9f -->
+      <a-asset-item id="micbutton"
+        src="https://cdn.glitch.global/63f1eb40-f41e-4c89-ab7f-5b5f6294c036/butonbir.glb?v=1706280177934"
+        response-type="arraybuffer" crossorigin="anonymous"></a-asset-item>
+      <a-asset-item id="messageText3" src="message.html"></a-asset-item>
+    </a-assets>
+
+    <a-assets timeout="10000">
+      <!-- Model by theGentleGiant https://sketchfab.com/3d-models/vintage-painting-dani-3fdd92904c2b44028bef28b33e897d9f -->
+      <a-asset-item id="micbuttonyellow"
+        src="https://cdn.glitch.global/63f1eb40-f41e-4c89-ab7f-5b5f6294c036/butonbirsar%C4%B1.glb?v=1706872464079"
+        response-type="arraybuffer" crossorigin="anonymous"></a-asset-item>
+      <a-asset-item id="messageText3" src="message.html"></a-asset-item>
+    </a-assets>
+
+    <a-assets timeout="10000">
+      <!-- Model by theGentleGiant https://sketchfab.com/3d-models/vintage-painting-dani-3fdd92904c2b44028bef28b33e897d9f -->
+      <a-asset-item id="mutebutton"
+        src="https://cdn.glitch.global/63f1eb40-f41e-4c89-ab7f-5b5f6294c036/butoniki.glb?v=1706280175616"
+        response-type="arraybuffer" crossorigin="anonymous"></a-asset-item>
+      <a-asset-item id="messageText3" src="message.html"></a-asset-item>
+    </a-assets>
+
+    <a-assets timeout="10000">
+      <!-- Model by theGentleGiant https://sketchfab.com/3d-models/vintage-painting-dani-3fdd92904c2b44028bef28b33e897d9f -->
+      <a-asset-item id="mutebuttonred"
+        src="https://cdn.glitch.global/63f1eb40-f41e-4c89-ab7f-5b5f6294c036/butonikikirmizi.glb?v=1706872564711"
+        response-type="arraybuffer" crossorigin="anonymous"></a-asset-item>
+      <a-asset-item id="messageText3" src="message.html"></a-asset-item>
+    </a-assets>
+
+    <a-assets timeout="10000">
+      <!-- Model by theGentleGiant https://sketchfab.com/3d-models/vintage-painting-dani-3fdd92904c2b44028bef28b33e897d9f -->
+      <a-asset-item id="frame"
+        src="https://cdn.glitch.global/63f1eb40-f41e-4c89-ab7f-5b5f6294c036/frame.glb?v=1706285277120"
+        response-type="arraybuffer" crossorigin="anonymous"></a-asset-item>
+      <a-asset-item id="messageText3" src="message.html"></a-asset-item>
+    </a-assets>
+
+    <a-assets timeout="10000">
+      <!-- Model by theGentleGiant https://sketchfab.com/3d-models/vintage-painting-dani-3fdd92904c2b44028bef28b33e897d9f -->
+      <a-asset-item id="frameandscreen"
+        src="https://cdn.glitch.global/63f1eb40-f41e-4c89-ab7f-5b5f6294c036/frameandscreen.glb?v=1706285273756"
+        response-type="arraybuffer" crossorigin="anonymous"></a-asset-item>
+      <a-asset-item id="messageText3" src="message.html"></a-asset-item>
+    </a-assets>
+
+    <a-assets>
+      <img id="my-image" src="https://cdn.glitch.global/63f1eb40-f41e-4c89-ab7f-5b5f6294c036/istanbul.webp?v=1706174762091">
+  </a-assets>
+
+      <!-- <a-entity id="tablet" position="0 1.5 -3" rotation="0 0 0" grabbable>
+        <a-plane position="0 0 0" width="1" height="0.6" color="#FFF"></a-plane>
+        <a-text id="questionText" position="0 0.2 0.01" text="align: center; width: 0.9" color="#000"></a-text>
+        <a-text id="answerText" position="0 -0.2 0.01" text="align: center; width: 0.9" color="#000"></a-text>
+    </a-entity> -->
+    <a-box id="boundingBox" material="color: red; wireframe: true; opacity: 0.5" visible="false"></a-box>
+
+
+      <a-entity id="recordButton" class="collidable" scale="1 1 1" position="0.45 1.3 -1.3" gltf-model="#mic"
+         grabbable></a-entity>
+        <a-entity id="rigtestchar" material="side: double" class="collidable" scale="1 1 1" position="0 0.7 -1.3" gltf-model="#rigtest"
+        grabbable ></a-entity>
+      <!-- <a-entity id="apainting" animation-mixer class="collidable" position="0 0.9 -17.5" gltf-model="#chartest"
+        anchored="persistent: true" painting painting-changer grabbable rotation="0 0 0">
+      </a-entity> -->
+     <!--  <a-text id="dynamicText" class="ignore-ray" follow-text="target: #rigtestchar; xOffset: -0.25; yOffset: 1; zOffset: 1.3"
+        text="value: Grab Mic To Talk; align: center; width: 4" position="0 1.9 0" color="#888"></a-text> -->
+      <a-entity id="rightHand" hand-state-updater hand-tracking-grab-controls="hand: right" anchor-grabbed-entity collision-detector hover></a-entity>
+      <a-entity id="leftHand" hand-state-updater hand-tracking-grab-controls="hand: left" anchor-grabbed-entity collision-detector hover></a-entity>
+      <!-- Question Plane -->
+    <!-- <a-entity grabbable id="questionPlane" position="0 1 0">
+      <a-plane color="black" width="1.5" height="0.5"></a-plane>
+      <a-text color="red" value="Your question here" wrap-count="20" width="1.5"></a-text>
+  </a-entity>
+  <a-entity grabbable id="answerPlane" position="0 0.5 0">
+      <a-plane color="black" width="1.5" height="0.5"></a-plane>
+      <a-text color="red" value="Your answer here" wrap-count="20" width="1.5"></a-text>
+  </a-entity> -->
+  <a-entity id="planeTotal" class="clickable" grabbable gltf-model="#planeModel" position="0 1.3 -0.8" scale="0.4 0.43 0.4" calculate-relative-position>
+    <!-- Question Plane as a child entity -->
+    <a-entity id="questionPlane" position="0.02 0.2 0" scale="0.8 0.5 1" >
+        <a-plane material="color: blue; transparent: true; opacity: 0" width="1" height="0.5"></a-plane>
+        <a-text value="Your question here" color="white" wrap-count="20" width="1"></a-text>
+    </a-entity>
+
+    <!-- Answer Plane as a child entity -->
+    <a-entity id="answerPlane" position="0.02  0 0" scale="0.8 0.5 1">
+        <a-plane material="color: blue; transparent: true; opacity: 1" width="0" height="0.5"></a-plane>
+        <a-text value="Your answer here" color="white" wrap-count="20" width="1"></a-text>
+    </a-entity>
+
+    <a-box lock-position visible="false" id="micBox"  grabbable position="-0.23 -0.18 0" scale="0.1 0.18 0.1"></a-box>
+    <a-entity id="mic" lock-position stationary-grab dynamic-body  gltf-model="#micbutton" position="-0.6 -0.32 0" scale="1 1 1"></a-entity>
+    <a-entity id="micyellow" visible="false" lock-position stationary-grab dynamic-body  gltf-model="#micbuttonyellow" position="-0.6 -0.32 0" scale="1 1 1"></a-entity>
+    <a-box lock-position visible="false" id="mutBox" position="0.19 -0.18 0" scale="0.1 0.18 0.1"></a-box>
+    <a-entity id="mut" visible="false" lock-position stationary-grab dynamic-body  gltf-model="#mutebutton" position="0.6 -0.32 0" scale="1 1 1"></a-entity>
+    <a-entity id="mutred" visible="false" lock-position stationary-grab dynamic-body  gltf-model="#mutebuttonred" position="0.6 -0.32 0" scale="1 1 1"></a-entity>
+  </a-entity>
+
+  <a-entity id="framePlane" class="clickable" grabbable  position="1 1.3 -0.8" scale="1 1 1 ">
+ 
+    <a-entity gltf-model="#frame"  position="0.05 0 0" scale="1 1 1" ></a-entity>
+    <a-entity gltf-model="#frameandscreen" position="0.05 0 0" scale="1 1 1"></a-entity>
+  </a-entity>
+  
+   <!--  <a-entity grabbable id="myImagePlane" position="1 1.3 -0.8"> 
+        <a-plane material="src: #my-image" position="0 0 0" rotation="0 0 0" scale="0.5 0.5 0.5"></a-plane>
+    </a-entity>   -->
+
       <a-entity>
-        <a-camera position="0 1.75 0" wasd-controls-enabled="false">
-          <a-entity
-            id="cursor"
-            cursor="rayOrigin: mouse"
-            position="0 0 -1"
-            visible="false"
-            geometry="primitive: ring; radiusInner: 0.015; radiusOuter: 0.018"
-            material="color: #888; shader: flat"
-          >
-            <a-entity screen-touch
-          /></a-entity>
+        <a-camera id="camera" look-at="#planeTotal" wasd-controls-enabled="false">
+          <a-entity id="cursor" cursor="rayOrigin: mouse; objects: .collidable" position="0 0 -1" visible="false"
+            geometry="primitive: ring; radiusInner: 0.015; radiusOuter: 0.018" material="color: #888; shader: flat">
+            <a-entity screen-touch />
+          </a-entity>
         </a-camera>
-        <a-sphere
-          chat-button
-          position="0 1 -1.5"
-          translate="0 3 0"
-          radius="0.1"
-          color="#ECECEC"
-          grabbable
-        />
+        <!-- <a-camera id="camera" look-at="#rigtestchar" position="0 0.75 2" rotation="0 0 0" wasd-controls-enabled="false">
+          <a-entity id="cursor" cursor="rayOrigin: mouse; objects: .collidable" position="0 0 -1" visible="false"
+            geometry="primitive: ring; radiusInner: 0.015; radiusOuter: 0.018" material="color: #888; shader: flat">
+            <a-entity screen-touch />
+          </a-entity>
+        </a-camera> -->
         <a-entity exit-ar-button></a-entity>
       </a-entity>
-
-      <a-entity light="type: ambient; intensity: 0.5;"></a-entity>
-      <a-light
-        type="directional"
-        light="castShadow: true;
-                      shadowMapHeight: 1024;
-                      shadowMapWidth: 1024;
-                      shadowCameraLeft: -2;
-                      shadowCameraRight: 2;
-                      shadowCameraBottom: -2;
-                      shadowCameraTop: 2;"
-        id="light"
-        target="#car"
-        position="-5 3 1.5"
-      ></a-light>
-
-      <a-entity
-        id="a-character"
-        position="0 0 -2"
-        gltf-model="#character"
-        anchored="persistent: true"
-        grabbable
-      ></a-entity>
-      <a-sound id="sound" src="" autoplay="true" position="0 2 5"></a-sound>
-      <a-entity
-        id="rightHand"
-        hand-tracking-grab-controls="hand: right"
-        anchor-grabbed-entity
-      ></a-entity>
-      <a-entity
-        id="leftHand"
-        hand-tracking-grab-controls="hand: left"
-        anchor-grabbed-entity
-      ></a-entity>
-
-      <a-plane
-        src="#ground"
-        height="200"
-        width="200"
-        rotation="-90 0 0"
-        hide-in-ar-mode
-        repeat="200 200"
-        shadow="receive:true"
-        ar-shadows="opacity: 0.3"
-        static-body="shape: none"
-        shape__main="shape: box; halfExtents: 100 100 0.125; offset: 0 0 -0.125"
-      ></a-plane>
-      <a-sky src="#bg" hide-in-ar-mode></a-sky>
-
-      <!-- Debugging settings
-           shadowCameraVisible: true;
-      -->
     </a-scene>
-    <script></script>
   </body>
-</html>
+
+  <script>
+    // Replace 'yourModelId' with the actual ID of your model
+      document.querySelector('a-scene').addEventListener('enter-vr', async () => {
+      console.log("geldi")
+      const scene = document.querySelector('a-scene');
+      console.log("geldik")
+      const session = scene.renderer.xr.getSession();
+
+      let referenceSpace;
+      console.log("test")
+      try {
+        referenceSpace = await session.requestReferenceSpace('bounded-floor');
+        console.log(referenceSpace)
+      } catch (e) {
+        console.error('Could not get local-floor reference space:', e);
+        return;
+      }
+
+      // Now you have a reference space that considers the floor level
+      // You can use this to position your model
+      const model = document.getElementById('apainting');
+      //model.object3D.position.setY(0); // Assuming the model's origin is at its base
+    });
+
+
+    document.getElementById('rigtestchar').addEventListener('model-loaded', (e) => {
+          const model = e.detail.model; // Get the loaded GLTF model
+          var modelEntity = e.target
+          console.log('Model loaded');
+
+          const observer = new MutationObserver(mutations => {
+            mutations.forEach(mutation => {
+              console.log(mutation.attributeName)
+              if (mutation.attributeName === 'scale') {
+                console.log('Scale changed:', model.getAttribute('scale'));
+              }
+            });
+          });
+
+          observer.observe(modelEntity, { attributes: true });
+
+
+          updateBoundingBox();
+          
+          console.log('Before scale set:', modelEntity.getAttribute('scale').x);
+          modelEntity.setAttribute('scale', {x: 1, y: 1, z: 1});
+          console.log('After scale set:', modelEntity.getAttribute('scale').x);
+          
+
+          if (model.animations && model.animations.length > 0) {
+              console.log('Animation names:');
+              model.animations.forEach((anim, index) => {
+                  console.log(`${index}: ${anim.name}`);
+              });
+              playAnimation("Idle")
+              //playAnimation("Mouth")
+          } else {
+              console.log('No animations found in the model');
+          }
+      });
+  /*     function updateTextContent(question, answer) {
+          const questionText = document.getElementById('questionText');
+          const answerText = document.getElementById('answerText');
+
+          // Function to dynamically adjust text size and wrapCount
+          function adjustTextSizeAndPosition(text, isQuestion) {
+              const baseSize = 0.9; // Base size for text width
+              const scalingFactor = 0.0005; // Adjust this factor to control text scaling
+              const size = Math.max(0.5, baseSize - text.length * scalingFactor);
+              const wrapCount = Math.max(20, text.length / (size * 100));
+
+              const yPosition = isQuestion ? 0.15 : -0.15; // Adjust Y position to minimize gap
+
+              return { size, wrapCount, yPosition };
+          }
+
+          // Adjust properties for question and answer
+          let questionProps = adjustTextSizeAndPosition(question, true);
+          let answerProps = adjustTextSizeAndPosition(answer, false);
+
+        // Update question text
+          questionText.setAttribute('text', `value: Question: ${question}; align: center; width: ${questionProps.size}; wrapCount: ${questionProps.wrapCount}`);
+          questionText.setAttribute('position', `0 ${questionProps.yPosition} 0.01`);
+
+          // Update answer text
+          answerText.setAttribute('text', `value: Answer: ${answer}; align: center; width: ${answerProps.size}; wrapCount: ${answerProps.wrapCount}`);
+          answerText.setAttribute('position', `0 ${answerProps.yPosition} 0.01`);
+
+      
+      
+      } */
+      function updateBoundingBox() {
+          console.log("gelmiyor")
+          var modelEl = document.getElementById('rigtestchar');
+          var bboxEl = document.getElementById('boundingBox');
+          console.log("geldi")
+          console.log(modelEl)
+          console.log(modelEl.object3D.isVisible)
+
+          // Ensure the model's object3D is available
+          if (modelEl > 0) {
+              var bbox = new THREE.Box3().setFromObject(modelEl.object3D);
+
+              // Log the bounding box dimensions for debugging
+              console.log('Bounding Box:', bbox.min, bbox.max);
+
+              // Calculate the center and size of the bounding box
+              var center = new THREE.Vector3();
+              bbox.getCenter(center);
+              var size = bbox.getSize(new THREE.Vector3());
+
+              // Update the bounding box entity's position and scale
+              bboxEl.object3D.position.set(center.x, center.y, center.z);
+              bboxEl.setAttribute('geometry', {
+                  primitive: 'box',
+                  width: size.x,
+                  height: size.y,
+                  depth: size.z
+              });
+              bboxEl.setAttribute('visible', true);
+          } else {
+              console.log('Model object3D not available or no children');
+          }
+      }
+
+          
+
+
+    // Example usage
+    const question = 'Your very long question text...Your very long question textYour very long question textYour very long question textYour very long question textYour very long question textYour very long question text...Your very long question textYour very long question textYour very long question textYour very long question textYour very long question textYour very long question text...Your very long question textYour very long question textYour very long question textYour very long question textYour very long question textYour very long question text...Your very long question textYour very long question textYour very long question textYour very long question textYour very long question textYour very long question text...Your very long question textYour very long question textYour very long question textYour very long question textYour very long question text';
+    const answer = 'Your very long answer text...Your very long question textYour very long question textYour very long question textYour very long question textYour very long question text...Your very long question textYour very long question textYour very long question textYour very long question textYour very long question textYour very long question text...Your very long question textYour very long question textYour very long question textYour very long question textYour very long question textYour very long question text...Your very long question textYour very long question textYour very long question textYour very long question textYour very long question textYour very long question text...Your very long question textYour very long question textYour very long question textYour very long question textYour very long question textYour very long question text...Your very long question text...Your very long question textYour very long question textYour very long question textYour very long question textYour very long question textYour very long question text...Your very long question textYour very long question textYour very long question textYour very long question textYour very long question textYour very long question text...Your very long question textYour very long question textYour very long question textYour very long question textYour very long question textYour very long question text...Your very long question textYour very long question textYour very long question textYour very long question textYour very long question textYour very long question text...Your very long question textYour very long question textYour very long question textYour very long question textYour very long question text Your very long question textYour very long question textYour very long question textYour very long question textYour very long question text';
+    updateTextContent(questionLine, answerLine);
+
+    // Example usage:
+    //updateTextContent("Short question text", "Longer answer text that needs to fit within the constraints of the plane without overflowing and maintaining a good visual appeal.");
+    //updateContent(question, answer)
+  </script>
+
+  </html>
