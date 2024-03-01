@@ -43,7 +43,7 @@
           questionLine = response.data.text
           answerLine = "Generating Your Answer"
           updateTextContent(questionLine,answerLine)
-          await getChatGPTResponse({ transcript: response.data.text });
+          await getChatGPTResponse({ transcript: response.data.text+ " use less than 7 sentence." });
         } catch (error) {
           console.log("error", error);
         }
@@ -236,6 +236,9 @@
       
         const grabbableElements = document.querySelectorAll('[anchor-grabbed-entity]');
         const recordButton = document.getElementById('recordButton');
+        const micButton = document.getElementById('micBox')
+        const mutButton = document.getElementById('mutBox')
+        
         console.log('Initial RecordButton state:', recordButton.getAttribute('grabbable'));
       
         grabbableElements.forEach(el => {
@@ -245,14 +248,9 @@
             const grabbedElement = evt.detail.grabbedEl; // Get the grabbed element
             console.log(grabbedElement.getAttribute('scale').x)
             console.log("Grab Started on element:", grabbedElement.id);
-            // Log the state of the grabbable component
             console.log('Grabbable state:', evt.detail.grabbedEl.getAttribute('grabbable'));
-
-            var firstPosition = document.getElementById('mic').object3D.position
-            var secondPosition = document.getElementById('mut').object3D.position
             
             if(grabbedElement.id == "micBox"){
-              console.log("geldi")
               if (!isRecordingInProgress) {
                 updateText('Start Talking. Release Mic To Stop');
                 console.log("Record Button grabbed");
@@ -266,17 +264,14 @@
             }
 
             if(grabbedElement.id == "mutBox"){
-              console.log("geldi2")
-              if (!isRecordingInProgress) {
-                updateText('Start Talking. Release Mic To Stop');
-                console.log("Record Button grabbed");
-                handleStartRecording().then(() => {
-                  document.getElementById('mut').setAttribute('visible', false);
-                  //document.getElementById('mutred').setAttribute('visible', true); 
-                  isRecordingInProgress = true;
-                });
-
+              if(document.getElementById('r2d2model').getAttribute('visible') == true){
+                console.log("geldi")
+                document.getElementById('r2d2model').setAttribute('visible', false);
               }
+              else{
+                document.getElementById('r2d2model').setAttribute('visible', true);
+              }
+              
             }
           });
 
@@ -296,69 +291,74 @@
               });
             }
             if (releasedElement.id == "mutBox" && isRecordingInProgress) {
-              handleStopRecording().then(() => {
-                isRecordingInProgress = false;
-                releasedElement.removeAttribute('grabbable')
-                //document.getElementById('mut').setAttribute('visible', true); 
-                document.getElementById('mutred').setAttribute('visible', false); 
-              });
+            
             }
           });
         });
 
+        
         // Add click event for PC browser interactions
-        recordButton.addEventListener('mouseup', (evt) => {
+        mutButton.addEventListener('mousedown', (evt) => {
+          if(document.getElementById('r2d2model').getAttribute('visible') == true){
+                console.log("geldi")
+                document.getElementById('r2d2model').setAttribute('visible', false);
+              }
+          else{
+                document.getElementById('r2d2model').setAttribute('visible', true);
+              }
+              
+        });
+
+        // Add click event for PC browser interactions
+        micButton.addEventListener('mousedown', (evt) => {
+            console.log('mouse-down')
+            const grabbedElement = evt.target; // Get the grabbed element
+              if (!isRecordingInProgress) {
+                updateText('Start Talking. Release Mic To Stop');
+                console.log("Record Button grabbed");
+                handleStartRecording().then(() => {
+                  document.getElementById('mic').setAttribute('visible', false);
+                  document.getElementById('micyellow').setAttribute('visible', true); // Change color on grab
+                  isRecordingInProgress = true;
+                });
+            }
+        });
+
+        micButton.addEventListener('mouseup', (evt) => {
           console.log('mouse-up')
-          playAnimation('Idle');
-          printModelTransformations('recordButton'); 
-          if (isRecordingInProgress) {
-            recordButton.setAttribute('visible', false);
-            handleStopRecording().then(() => {
-              isRecordingInProgress = false;
-              recordButton.setAttribute('material', 'color', 'green'); // Revert color on release
-            });
-          }
+          handleStopRecording().then(() => {
+                isRecordingInProgress = false;
+                document.getElementById('mic').setAttribute('visible', true); 
+                document.getElementById('micyellow').setAttribute('visible', false); 
+              });
         });
 
+
         // Add touchstart event for mobile touch interactions
-        recordButton.addEventListener('touchstart', (evt) => {
+        micButton.addEventListener('touchstart', (evt) => {
           console.log('touch-started')
-          if (isRecordingInProgress) {
-            recordButton.setAttribute('visible', false);
-            handleStopRecording().then(() => {
-              isRecordingInProgress = false;
-              recordButton.setAttribute('material', 'color', 'green'); // Revert color on release
-            });
-          }
+            const grabbedElement = evt.target; // Get the grabbed element
+              if (!isRecordingInProgress) {
+                updateText('Start Talking. Release Mic To Stop');
+                console.log("Record Button grabbed");
+                handleStartRecording().then(() => {
+                  document.getElementById('mic').setAttribute('visible', false);
+                  document.getElementById('micyellow').setAttribute('visible', true); // Change color on grab
+                  isRecordingInProgress = true;
+                });
+            }
 
         });
 
-        recordButton.addEventListener('mousedown', (evt) => {
-          console.log('mouse-down')
-          if (!isRecordingInProgress) {
-            updateText('Start Talking. Release Mic To Stop');
-            console.log("Record Button grabbed");
-            handleStartRecording().then(() => {
-              recordButton.setAttribute('material', 'color', 'red'); // Change color on grab
-              isRecordingInProgress = true;
-            });
-
-          }
-        });
-
+      
         // Add touchstart event for mobile touch interactions
-        recordButton.addEventListener('touchended', (evt) => {
+        micButton.addEventListener('touchended', (evt) => {
           console.log('touch-ended')
-
-          if (!isRecordingInProgress) {
-            updateText('Start Talking. Release Mic To Stop');
-            console.log("Record Button grabbed");
-            handleStartRecording().then(() => {
-              recordButton.setAttribute('material', 'color', 'red'); // Change color on grab
-              isRecordingInProgress = true;
-            });
-
-          }
+          handleStopRecording().then(() => {
+                isRecordingInProgress = false;
+                document.getElementById('mic').setAttribute('visible', true); 
+                document.getElementById('micyellow').setAttribute('visible', false); 
+              });
         });
       });
 
@@ -667,6 +667,13 @@
           response-type="arraybuffer" crossorigin="anonymous"></a-asset-item>
         <a-asset-item id="messageText3" src="message.html"></a-asset-item>
       </a-assets>
+      <a-assets timeout="10000">
+        <!-- Model by theGentleGiant https://sketchfab.com/3d-models/vintage-painting-dani-3fdd92904c2b44028bef28b33e897d9f -->
+        <a-asset-item id="r2d2"
+          src="https://cdn.glitch.global/63f1eb40-f41e-4c89-ab7f-5b5f6294c036/r2d2.glb?v=1709059010350"
+          response-type="arraybuffer" crossorigin="anonymous"></a-asset-item>
+        <a-asset-item id="messageText3" src="message.html"></a-asset-item>
+      </a-assets>
 <!-- 
       <a-assets timeout="10000">
         <a-asset-item id="arabicchar"
@@ -677,13 +684,13 @@
  -->
 
       <a-assets>
-        <a-asset-item id="planeModel" src="https://cdn.glitch.global/63f1eb40-f41e-4c89-ab7f-5b5f6294c036/bgnew.glb?v=1706017520148"></a-asset-item>
+        <a-asset-item id="planeModel" src="https://cdn.glitch.global/63f1eb40-f41e-4c89-ab7f-5b5f6294c036/bgnew.glb?v=1709285249102"></a-asset-item>
     </a-assets>
 
     <a-assets timeout="10000">
       <!-- Model by theGentleGiant https://sketchfab.com/3d-models/vintage-painting-dani-3fdd92904c2b44028bef28b33e897d9f -->
       <a-asset-item id="micbutton"
-        src="https://cdn.glitch.global/63f1eb40-f41e-4c89-ab7f-5b5f6294c036/butonbir.glb?v=1706280177934"
+        src="https://cdn.glitch.global/63f1eb40-f41e-4c89-ab7f-5b5f6294c036/newmic.glb?v=1709285267238"
         response-type="arraybuffer" crossorigin="anonymous"></a-asset-item>
       <a-asset-item id="messageText3" src="message.html"></a-asset-item>
     </a-assets>
@@ -699,7 +706,7 @@
     <a-assets timeout="10000">
       <!-- Model by theGentleGiant https://sketchfab.com/3d-models/vintage-painting-dani-3fdd92904c2b44028bef28b33e897d9f -->
       <a-asset-item id="mutebutton"
-        src="https://cdn.glitch.global/63f1eb40-f41e-4c89-ab7f-5b5f6294c036/butoniki.glb?v=1706280175616"
+        src="https://cdn.glitch.global/63f1eb40-f41e-4c89-ab7f-5b5f6294c036/robotplusicon.glb?v=1709285270429"
         response-type="arraybuffer" crossorigin="anonymous"></a-asset-item>
       <a-asset-item id="messageText3" src="message.html"></a-asset-item>
     </a-assets>
@@ -744,6 +751,8 @@
          grabbable></a-entity>
         <a-entity id="rigtestchar" material="side: double" class="collidable" scale="1 1 1" position="0 0.7 -1.3" gltf-model="#rigtest"
         grabbable ></a-entity>
+        <a-entity id="r2d2model" visible="false" material="side: double" class="collidable" scale="0.3 0.3 0.3" position="-1 0.7 -1.3" gltf-model="#r2d2"
+        grabbable ></a-entity>
       <!-- <a-entity id="apainting" animation-mixer class="collidable" position="0 0.9 -17.5" gltf-model="#chartest"
         anchored="persistent: true" painting painting-changer grabbable rotation="0 0 0">
       </a-entity> -->
@@ -776,8 +785,8 @@
     <a-box lock-position visible="false" id="micBox"  grabbable position="-0.23 -0.18 0" scale="0.1 0.18 0.1"></a-box>
     <a-entity id="mic" lock-position stationary-grab dynamic-body  gltf-model="#micbutton" position="-0.6 -0.32 0" scale="1 1 1"></a-entity>
     <a-entity id="micyellow" visible="false" lock-position stationary-grab dynamic-body  gltf-model="#micbuttonyellow" position="-0.6 -0.32 0" scale="1 1 1"></a-entity>
-    <a-box lock-position visible="false" id="mutBox" position="0.19 -0.18 0" scale="0.1 0.18 0.1"></a-box>
-    <a-entity id="mut" visible="false" lock-position stationary-grab dynamic-body  gltf-model="#mutebutton" position="0.6 -0.32 0" scale="1 1 1"></a-entity>
+    <a-box lock-position visible="false" id="mutBox" position="0.19 -0.18 0" scale="0.2 0.18 0.1"></a-box>
+    <a-entity id="mut" lock-position stationary-grab dynamic-body  gltf-model="#mutebutton" position="0.05 -0.32 0" scale="0.8 0.8 0.8"></a-entity>
     <a-entity id="mutred" visible="false" lock-position stationary-grab dynamic-body  gltf-model="#mutebuttonred" position="0.6 -0.32 0" scale="1 1 1"></a-entity>
   </a-entity>
 
